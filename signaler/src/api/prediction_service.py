@@ -9,6 +9,7 @@ from datetime import datetime, date
 import pandas as pd
 from loguru import logger
 import os
+import numpy as np  # Add this line
 
 from src.training.prediction_pipeline import PredictionPipeline, RealTimePredictionService
 from src.utils.bigquery_client import BigQueryClient
