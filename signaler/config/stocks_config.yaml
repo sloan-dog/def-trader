@@ -1,0 +1,201 @@
+# Stock tickers organized by sector
+# Each stock includes metadata for graph construction
+
+technology:
+  - ticker: AAPL
+    name: Apple Inc.
+    market_cap: large
+    sub_industry: consumer_electronics
+  - ticker: MSFT
+    name: Microsoft Corporation
+    market_cap: large
+    sub_industry: software
+  - ticker: GOOGL
+    name: Alphabet Inc.
+    market_cap: large
+    sub_industry: internet_services
+  - ticker: NVDA
+    name: NVIDIA Corporation
+    market_cap: large
+    sub_industry: semiconductors
+
+financials:
+  - ticker: JPM
+    name: JPMorgan Chase & Co.
+    market_cap: large
+    sub_industry: diversified_banks
+  - ticker: BAC
+    name: Bank of America Corp
+    market_cap: large
+    sub_industry: diversified_banks
+  - ticker: GS
+    name: Goldman Sachs Group Inc.
+    market_cap: large
+    sub_industry: investment_banking
+  - ticker: BRK.B
+    name: Berkshire Hathaway Inc.
+    market_cap: large
+    sub_industry: multi_sector_holdings
+
+healthcare:
+  - ticker: JNJ
+    name: Johnson & Johnson
+    market_cap: large
+    sub_industry: pharmaceuticals
+  - ticker: UNH
+    name: UnitedHealth Group Inc.
+    market_cap: large
+    sub_industry: managed_healthcare
+  - ticker: PFE
+    name: Pfizer Inc.
+    market_cap: large
+    sub_industry: pharmaceuticals
+  - ticker: ABBV
+    name: AbbVie Inc.
+    market_cap: large
+    sub_industry: pharmaceuticals
+
+consumer_discretionary:
+  - ticker: AMZN
+    name: Amazon.com Inc.
+    market_cap: large
+    sub_industry: internet_retail
+  - ticker: TSLA
+    name: Tesla Inc.
+    market_cap: large
+    sub_industry: automobile_manufacturers
+  - ticker: HD
+    name: Home Depot Inc.
+    market_cap: large
+    sub_industry: home_improvement_retail
+  - ticker: MCD
+    name: McDonald's Corporation
+    market_cap: large
+    sub_industry: restaurants
+
+energy:
+  - ticker: XOM
+    name: Exxon Mobil Corporation
+    market_cap: large
+    sub_industry: integrated_oil_gas
+  - ticker: CVX
+    name: Chevron Corporation
+    market_cap: large
+    sub_industry: integrated_oil_gas
+  - ticker: COP
+    name: ConocoPhillips
+    market_cap: large
+    sub_industry: oil_gas_exploration
+  - ticker: SLB
+    name: Schlumberger Limited
+    market_cap: large
+    sub_industry: oil_gas_equipment
+
+industrials:
+  - ticker: CAT
+    name: Caterpillar Inc.
+    market_cap: large
+    sub_industry: construction_machinery
+  - ticker: BA
+    name: Boeing Company
+    market_cap: large
+    sub_industry: aerospace_defense
+  - ticker: UPS
+    name: United Parcel Service Inc.
+    market_cap: large
+    sub_industry: air_freight_logistics
+  - ticker: HON
+    name: Honeywell International Inc.
+    market_cap: large
+    sub_industry: industrial_conglomerates
+
+consumer_staples:
+  - ticker: PG
+    name: Procter & Gamble Company
+    market_cap: large
+    sub_industry: household_products
+  - ticker: KO
+    name: Coca-Cola Company
+    market_cap: large
+    sub_industry: soft_drinks
+  - ticker: WMT
+    name: Walmart Inc.
+    market_cap: large
+    sub_industry: hypermarkets_super_centers
+  - ticker: PEP
+    name: PepsiCo Inc.
+    market_cap: large
+    sub_industry: soft_drinks
+
+utilities:
+  - ticker: NEE
+    name: NextEra Energy Inc.
+    market_cap: large
+    sub_industry: electric_utilities
+  - ticker: DUK
+    name: Duke Energy Corporation
+    market_cap: large
+    sub_industry: electric_utilities
+  - ticker: SO
+    name: Southern Company
+    market_cap: large
+    sub_industry: electric_utilities
+  - ticker: D
+    name: Dominion Energy Inc.
+    market_cap: large
+    sub_industry: multi_utilities
+
+materials:
+  - ticker: LIN
+    name: Linde plc
+    market_cap: large
+    sub_industry: industrial_gases
+  - ticker: APD
+    name: Air Products and Chemicals Inc.
+    market_cap: large
+    sub_industry: industrial_gases
+  - ticker: ECL
+    name: Ecolab Inc.
+    market_cap: large
+    sub_industry: specialty_chemicals
+  - ticker: NEM
+    name: Newmont Corporation
+    market_cap: large
+    sub_industry: gold
+
+real_estate:
+  - ticker: PLD
+    name: Prologis Inc.
+    market_cap: large
+    sub_industry: industrial_reits
+  - ticker: AMT
+    name: American Tower Corporation
+    market_cap: large
+    sub_industry: specialized_reits
+  - ticker: CCI
+    name: Crown Castle Inc.
+    market_cap: large
+    sub_industry: specialized_reits
+  - ticker: EQIX
+    name: Equinix Inc.
+    market_cap: large
+    sub_industry: specialized_reits
+
+# Market indices for benchmarking
+indices:
+  - ticker: SPY
+    name: SPDR S&P 500 ETF
+    market_cap: etf
+    sub_industry: broad_market_etf
+  - ticker: QQQ
+    name: Invesco QQQ Trust
+    market_cap: etf
+    sub_industry: technology_etf
+  - ticker: DIA
+    name: SPDR Dow Jones Industrial Average ETF
+    market_cap: etf
+    sub_industry: broad_market_etf
+  - ticker: IWM
+    name: iShares Russell 2000 ETF
+    market_cap: etf
+    sub_industry: small_cap_etf
