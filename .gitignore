@@ -1,0 +1,421 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# pdm
+.pdm.toml
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.env.local
+.env.*.local
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Data files
+data/
+*.csv
+*.parquet
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+*.json
+!config/*.json
+!package.json
+!tsconfig.json
+*.xlsx
+*.xls
+*.feather
+*.msgpack
+
+# Model files
+models/
+*.pth
+*.pt
+*.ckpt
+*.h5
+*.pb
+*.onnx
+*.tflite
+*.keras
+*.safetensors
+mlruns/
+*.mlflow
+checkpoints/
+
+# Logs
+logs/
+*.log
+*.out
+*.err
+log/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+
+# Cache
+.cache/
+*.cache
+__pycache__/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Google Cloud
+.gcloud/
+*.json
+!package.json
+!tsconfig.json
+!composer.json
+service-account-key.json
+gcp-key.json
+*-key.json
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+*.tfplan
+*.tfvars
+!terraform.tfvars.example
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# MLflow
+mlruns/
+mlflow.db
+
+# Airflow
+airflow.db
+airflow.cfg
+airflow_login.py
+unittests.cfg
+airflow-webserver.pid
+standalone_admin_password.txt
+
+# Secrets
+secrets/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# API keys
+alpha_vantage_key.txt
+api_keys.txt
+credentials/
+
+# BigQuery
+.bigquery/
+
+# Monitoring
+grafana-storage/
+prometheus-data/
+
+# Node (if using any frontend)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Documentation builds
+docs/_build/
+docs/.doctrees/
+site/
+
+# Virtual environments
+bin/
+include/
+lib/
+lib64/
+share/
+pyvenv.cfg
+
+# Compiled files
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.dylib
+*.dll
+
+# Archive files
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# Editor backup files
+*.orig
+*.rej
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Custom
+scratch/
+sandbox/
+experiments/
+*.bak.py
+old/
+deprecated/
+TODO.txt
+NOTES.txt
+local_config.py
+
+# Notebook outputs (for security)
+notebooks/*_output/
+notebooks/*_results/
+
+# Performance profiling
+*.prof
+*.lprof
+.profile_output/
+
+# Trading specific
+backtest_results/
+live_trades/
+paper_trades/
+portfolio_snapshots/
+
+# Large data files
+historical_data/
+market_data/
+*.tar
+*.gz
+
+# Environment specific
+.env.*
+!.env.example
+config/local/
+config/prod/
+!config/prod/.gitkeep
+
+# CI/CD
+.github/workflows/local/
+deployment_keys/
+
+# Generated files
+src/generated/
+build_artifacts/
+
+# Debugging
+.vscode/launch.json
+.vscode/settings.json
+debug/
+*.dmp
+core.*
+
+# Lock files (controversial, but for a trading system we want exact versions)
+# Uncomment if you want to track lock files
+# Pipfile.lock
+# poetry.lock
+# package-lock.json
+# yarn.lock
