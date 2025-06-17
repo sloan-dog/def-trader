@@ -419,3 +419,6 @@ core.*
 # poetry.lock
 # package-lock.json
 # yarn.lock
+
+venv
+*/venv
