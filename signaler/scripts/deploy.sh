@@ -1,306 +1,317 @@
-# GNN-Based Trading Signal System
+#!/bin/bash
 
-A sophisticated trading signal generation system that uses Graph Neural Networks (GNN) to analyze market relationships and predict multi-horizon price movements.
+# GCP Deployment Script for Trading Signal System (pyproject.toml version)
 
-## Overview
+set -e  # Exit on any error
 
-This system combines:
-- **Temporal Graph Neural Networks** for capturing cross-stock relationships and temporal patterns
-- **Comprehensive data ingestion** from multiple sources (OHLCV, technical indicators, macro data, sentiment)
-- **Multi-horizon predictions** (1, 7, 30, 60 days)
-- **Cloud-native architecture** on Google Cloud Platform
-- **Automated training and prediction pipelines**
+# Default values
+PROJECT_ID=""
+REGION="us-central1"
+PYTHON_VERSION="3.11.6"
+BUILD_IMAGES=true
+DEPLOY_TERRAFORM=true
+SKIP_TESTS=false
 
-## Architecture
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
-### Data Flow
-1. **Data Ingestion**: Daily collection of market data, technical indicators, and macro indicators
-2. **Feature Engineering**: Calculation of 20+ technical indicators and temporal features
-3. **Graph Construction**: Dynamic relationship modeling between stocks
-4. **Model Training**: Temporal GNN with attention mechanisms
-5. **Prediction Generation**: Multi-horizon return predictions with confidence scores
-6. **Signal Generation**: Actionable trading signals based on predictions
+# Function to print colored output
+print_status() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
 
-### Key Components
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
 
-#### Data Sources
-- **Market Data**: OHLCV data from Alpha Vantage
-- **Technical Indicators**: RSI, MACD, Bollinger Bands, etc.
-- **Macro Indicators**: GDP, CPI, unemployment, yield curves
-- **Sentiment Data**: News sentiment analysis
-- **Temporal Features**: Holidays, earnings seasons, market regimes
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
 
-#### Model Architecture
-- **Temporal GNN**: Combines graph convolutions with LSTM and attention
-- **Multi-horizon heads**: Separate prediction heads for each time horizon
-- **Confidence estimation**: Calibrated confidence scores for each prediction
+# Function to show usage
+show_usage() {
+    cat << EOF
+Usage: $0 [OPTIONS]
 
-#### Infrastructure
-- **BigQuery**: Scalable data warehouse for all historical data
-- **Cloud Run**: Containerized services for data ingestion and predictions
-- **Vertex AI**: Distributed model training
-- **Cloud Scheduler**: Automated job orchestration
+Deploy Trading Signal System to Google Cloud Platform
 
-## Getting Started
+OPTIONS:
+    --project-id PROJECT_ID     GCP Project ID (required)
+    --region REGION            GCP Region (default: us-central1)
+    --python-version VERSION   Python version (default: 3.11.6)
+    --skip-images              Skip building Docker images
+    --skip-terraform           Skip Terraform deployment
+    --skip-tests               Skip running tests before deployment
+    --help                     Show this help message
 
-### Prerequisites
-- Google Cloud Platform account
-- Python 3.9+
-- Docker
-- Terraform
-- Alpha Vantage API key
+EXAMPLES:
+    $0 --project-id my-trading-project
+    $0 --project-id my-project --region us-west1 --skip-tests
+    $0 --project-id my-project --skip-images --skip-terraform
+EOF
+}
 
-### Installation
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --project-id)
+            PROJECT_ID="$2"
+            shift 2
+            ;;
+        --region)
+            REGION="$2"
+            shift 2
+            ;;
+        --python-version)
+            PYTHON_VERSION="$2"
+            shift 2
+            ;;
+        --skip-images)
+            BUILD_IMAGES=false
+            shift
+            ;;
+        --skip-terraform)
+            DEPLOY_TERRAFORM=false
+            shift
+            ;;
+        --skip-tests)
+            SKIP_TESTS=true
+            shift
+            ;;
+        --help)
+            show_usage
+            exit 0
+            ;;
+        *)
+            print_error "Unknown option: $1"
+            show_usage
+            exit 1
+            ;;
+    esac
+done
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourorg/trading-signal-system.git
-cd trading-signal-system
-```
+# Validate required parameters
+if [[ -z "$PROJECT_ID" ]]; then
+    print_error "Project ID is required. Use --project-id PROJECT_ID"
+    show_usage
+    exit 1
+fi
 
-2. Set up Python environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-pip install -e .
-```
+print_status "Starting deployment to GCP..."
+print_status "Project ID: $PROJECT_ID"
+print_status "Region: $REGION"
+print_status "Python Version: $PYTHON_VERSION"
 
-3. Configure environment:
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
+# Check prerequisites
+print_status "Checking prerequisites..."
 
-4. Set up GCP credentials:
-```bash
-gcloud auth login
-gcloud config set project YOUR_PROJECT_ID
-```
+# Check if required tools are installed
+for tool in gcloud docker python terraform; do
+    if ! command -v $tool &> /dev/null; then
+        print_error "$tool is not installed or not in PATH"
+        exit 1
+    fi
+done
 
-### Deployment
+# Check Python version
+current_python_version=$(python --version 2>&1 | cut -d' ' -f2)
+if [[ "$current_python_version" != "$PYTHON_VERSION"* ]]; then
+    print_warning "Current Python version ($current_python_version) doesn't match target ($PYTHON_VERSION)"
+    if command -v pyenv &> /dev/null; then
+        print_status "Using pyenv to switch to Python $PYTHON_VERSION"
+        pyenv local $PYTHON_VERSION
+    fi
+fi
 
-Deploy the entire system with:
-```bash
-./scripts/deploy.sh --project-id YOUR_PROJECT_ID --region us-central1
-```
+# Check if gcloud is authenticated
+if ! gcloud auth list --filter=status:ACTIVE --format="value(account)" | grep -q .; then
+    print_error "Not authenticated with gcloud. Run: gcloud auth login"
+    exit 1
+fi
 
-This will:
-1. Enable required GCP APIs
-2. Build and push Docker images
-3. Deploy infrastructure with Terraform
-4. Set up Cloud Run services
-5. Create scheduled jobs
+# Set the project
+print_status "Setting GCP project to $PROJECT_ID"
+gcloud config set project $PROJECT_ID
 
-### Running Locally
+# Check if project exists and is accessible
+if ! gcloud projects describe $PROJECT_ID &> /dev/null; then
+    print_error "Cannot access project $PROJECT_ID. Check project ID and permissions."
+    exit 1
+fi
 
-#### Data Backfill
-```bash
-python -m src.jobs.backfill_job \
-  --start-date 2022-01-01 \
-  --end-date 2023-12-31 \
-  --data-types all
-```
-
-#### Daily Ingestion
-```bash
-python -m src.jobs.daily_ingestion --date 2024-01-15
-```
-
-#### Model Training
-```bash
-python -m src.jobs.training_job \
-  --end-date 2023-12-31 \
-  --lookback-months 24
-```
-
-#### Generate Predictions
-```bash
-python -m src.training.prediction_pipeline \
-  --model-version latest \
-  --prediction-date 2024-01-15
-```
-
-## Configuration
-
-### Stock Universe
-The system tracks 40 carefully selected stocks across 10 sectors:
-- Technology (AAPL, MSFT, GOOGL, NVDA)
-- Financials (JPM, BAC, GS, BRK.B)
-- Healthcare (JNJ, UNH, PFE, ABBV)
-- And more...
-
-Edit `config/stocks_config.yaml` to modify the stock universe.
-
-### Model Parameters
-Key parameters in `config/settings.py`:
-- `historical_window`: 90 days of lookback
-- `prediction_horizons`: [1, 7, 30, 60] days
-- `hidden_dim`: 128 (GNN hidden dimension)
-- `num_gnn_layers`: 3
-- `attention_heads`: 4
-
-### Technical Indicators
-Configure indicators in `config/indicators_config.yaml`:
-- RSI (14-day)
-- EMA (9, 20, 50)
-- MACD (12, 26, 9)
-- Bollinger Bands (20, 2)
-- And more...
-
-## Usage Examples
-
-### Generating Trading Signals
-```python
-from src.training.prediction_pipeline import PredictionPipeline
-
-# Initialize pipeline
-pipeline = PredictionPipeline(model_path="models/best_model.pth")
-
-# Generate predictions
-predictions = pipeline.generate_predictions(
-    prediction_date="2024-01-15",
-    tickers=["AAPL", "GOOGL", "JPM"]
+# Enable required APIs
+print_status "Enabling required GCP APIs..."
+apis=(
+    "bigquery.googleapis.com"
+    "run.googleapis.com"
+    "cloudscheduler.googleapis.com"
+    "cloudbuild.googleapis.com"
+    "containerregistry.googleapis.com"
+    "aiplatform.googleapis.com"
+    "storage.googleapis.com"
+    "secretmanager.googleapis.com"
 )
 
-# Convert to trading signals
-signals = pipeline.generate_trading_signals(
-    predictions,
-    confidence_threshold=0.6,
-    return_threshold=0.02
-)
-```
+for api in "${apis[@]}"; do
+    print_status "Enabling $api..."
+    gcloud services enable $api
+done
 
-### Portfolio Construction
-```python
-# Create portfolio allocation
-portfolio = pipeline.create_portfolio_allocation(
-    signals,
-    max_positions=20,
-    risk_parity=True
-)
-```
+# Run tests before deployment (unless skipped)
+if [[ "$SKIP_TESTS" == false ]]; then
+    print_status "Running tests before deployment..."
+    if [[ -f "pyproject.toml" ]]; then
+        pip install -e ".[test,lint]"
+        pytest tests/ -v -m "not integration" || {
+            print_error "Tests failed. Use --skip-tests to deploy anyway."
+            exit 1
+        }
+        print_status "All tests passed!"
+    else
+        print_warning "No pyproject.toml found, skipping tests"
+    fi
+fi
 
-## Model Performance
+# Build and push Docker images
+if [[ "$BUILD_IMAGES" == true ]]; then
+    print_status "Building and pushing Docker images..."
 
-The system tracks multiple performance metrics:
-- **Direction Accuracy**: >52% (better than random)
-- **Sharpe Ratio**: Target >0.5
-- **Information Coefficient**: Correlation between predictions and returns
-- **Risk Metrics**: VaR, CVaR, Maximum Drawdown
+    # Configure Docker for GCR
+    gcloud auth configure-docker
 
-## Monitoring
+    # Build images
+    images=("base" "ingestion" "api")
+    for image in "${images[@]}"; do
+        print_status "Building $image image..."
+        docker build \
+            -f docker/Dockerfile.$image \
+            -t gcr.io/$PROJECT_ID/trading-system/$image:latest \
+            -t gcr.io/$PROJECT_ID/trading-system/$image:$(git rev-parse --short HEAD) \
+            --build-arg PYTHON_VERSION=$PYTHON_VERSION \
+            .
 
-### BigQuery Dashboards
-Monitor system health and performance:
-- Data ingestion status
-- Prediction accuracy over time
-- Model performance metrics
-- System errors and alerts
+        print_status "Pushing $image image..."
+        docker push gcr.io/$PROJECT_ID/trading-system/$image:latest
+        docker push gcr.io/$PROJECT_ID/trading-system/$image:$(git rev-parse --short HEAD)
+    done
+fi
 
-### Logging
-Logs are stored in:
-- Local: `logs/` directory
-- Cloud: Google Cloud Logging
+# Deploy infrastructure with Terraform
+if [[ "$DEPLOY_TERRAFORM" == true ]]; then
+    print_status "Deploying infrastructure with Terraform..."
 
-### Alerts
-Configure alerts for:
-- Data ingestion failures
-- Model performance degradation
-- System errors
+    cd terraform
 
-## Development
+    # Initialize Terraform
+    terraform init
 
-### Project Structure
-```
-trading-signal-system/
-├── config/              # Configuration files
-├── src/                 # Source code
-│   ├── data_ingestion/  # Data fetching modules
-│   ├── feature_engineering/  # Feature calculation
-│   ├── models/          # GNN model architecture
-│   ├── training/        # Training and prediction
-│   ├── utils/           # Utilities
-│   └── jobs/            # Orchestration jobs
-├── terraform/           # Infrastructure as code
-├── docker/              # Containerization
-├── tests/               # Unit and integration tests
-├── notebooks/           # Analysis notebooks
-└── scripts/             # Deployment scripts
-```
+    # Plan deployment
+    terraform plan \
+        -var="project_id=$PROJECT_ID" \
+        -var="region=$REGION" \
+        -out=tfplan
 
-### Testing
-Run tests with:
-```bash
-pytest tests/
-```
+    # Apply deployment
+    print_status "Applying Terraform configuration..."
+    terraform apply tfplan
 
-### Contributing
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+    cd ..
 
-## Best Practices
+    print_status "Infrastructure deployment completed!"
+fi
 
-### Data Quality
-- Daily validation checks on ingested data
-- Outlier detection and handling
-- Missing data imputation strategies
+# Deploy Cloud Run services
+print_status "Deploying Cloud Run services..."
 
-### Model Management
-- Version control for models
-- A/B testing for new models
-- Regular retraining schedule
+# Deploy daily ingestion service
+print_status "Deploying daily ingestion service..."
+gcloud run deploy daily-ingestion \
+    --image gcr.io/$PROJECT_ID/trading-system/ingestion:latest \
+    --platform managed \
+    --region $REGION \
+    --no-allow-unauthenticated \
+    --service-account trading-system@$PROJECT_ID.iam.gserviceaccount.com \
+    --memory 4Gi \
+    --cpu 2 \
+    --timeout 3600 \
+    --max-instances 10
 
-### Risk Management
-- Position sizing based on confidence
-- Diversification across sectors
-- Maximum drawdown limits
+# Deploy API service
+print_status "Deploying API service..."
+gcloud run deploy prediction-api \
+    --image gcr.io/$PROJECT_ID/trading-system/api:latest \
+    --platform managed \
+    --region $REGION \
+    --allow-unauthenticated \
+    --service-account trading-system@$PROJECT_ID.iam.gserviceaccount.com \
+    --memory 8Gi \
+    --cpu 4 \
+    --timeout 900 \
+    --max-instances 10
 
-## Troubleshooting
+# Get service URLs
+INGESTION_URL=$(gcloud run services describe daily-ingestion --region=$REGION --format="value(status.url)")
+API_URL=$(gcloud run services describe prediction-api --region=$REGION --format="value(status.url)")
 
-### Common Issues
+print_status "Service URLs:"
+print_status "  Ingestion Service: $INGESTION_URL"
+print_status "  API Service: $API_URL"
 
-1. **Alpha Vantage Rate Limits**
-   - Solution: Implement exponential backoff
-   - Consider premium API key
+# Update Cloud Scheduler jobs
+print_status "Setting up Cloud Scheduler jobs..."
 
-2. **BigQuery Quota Exceeded**
-   - Solution: Optimize queries
-   - Use partitioned tables
+# Create daily ingestion job
+gcloud scheduler jobs create http daily-data-ingestion \
+    --location=$REGION \
+    --schedule="0 18 * * MON-FRI" \
+    --uri="$INGESTION_URL/run" \
+    --http-method=POST \
+    --oidc-service-account-email=trading-system@$PROJECT_ID.iam.gserviceaccount.com \
+    --time-zone="America/New_York" \
+    --max-retry-attempts=3 \
+    --max-retry-duration=600s \
+    --min-backoff-duration=5s \
+    --max-backoff-duration=300s \
+    --attempt-deadline=3600s || {
+        print_warning "Scheduler job might already exist, updating..."
+        gcloud scheduler jobs update http daily-data-ingestion \
+            --location=$REGION \
+            --schedule="0 18 * * MON-FRI" \
+            --uri="$INGESTION_URL/run"
+    }
 
-3. **Model Training OOM**
-   - Solution: Reduce batch size
-   - Use gradient accumulation
+# Test API health
+print_status "Testing API health..."
+if curl -f "$API_URL/health" &> /dev/null; then
+    print_status "API health check passed!"
+else
+    print_warning "API health check failed. Service might still be starting up."
+fi
 
-## Cost Optimization
-
-Estimated monthly costs:
-- BigQuery: ~$50-100 (depending on data volume)
-- Cloud Run: ~$20-50 (based on usage)
-- Vertex AI: ~$100-200 (training frequency)
-- Cloud Storage: ~$10-20
-
-Tips:
-- Use BigQuery partitioning
-- Schedule jobs during off-peak hours
-- Clean up old model artifacts
-
-## Future Enhancements
-
-- [ ] Real-time data streaming
-- [ ] Alternative data sources (satellite, social media)
-- [ ] Reinforcement learning for portfolio optimization
-- [ ] Multi-asset class support
-- [ ] Advanced risk models
-- [ ] Interactive dashboards
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Disclaimer
-
-This system is for educational and research purposes only. Always perform your own due diligence before making investment decisions. Past performance does not guarantee future results.
+# Deployment summary
+print_status "Deployment completed successfully! 🎉"
+print_status ""
+print_status "Summary:"
+print_status "  Project: $PROJECT_ID"
+print_status "  Region: $REGION"
+print_status "  API URL: $API_URL"
+print_status "  Ingestion URL: $INGESTION_URL"
+print_status ""
+print_status "Next steps:"
+print_status "  1. Set up your Alpha Vantage API key in Secret Manager"
+print_status "  2. Run initial data backfill"
+print_status "  3. Train your first model"
+print_status "  4. Set up monitoring and alerts"
+print_status ""
+print_status "Commands to get started:"
+print_status "  # Set API key"
+print_status "  gcloud secrets versions add alpha-vantage-api-key --data-file=<(echo 'YOUR_API_KEY')"
+print_status ""
+print_status "  # Run backfill"
+print_status "  curl -X POST '$INGESTION_URL/backfill' -H 'Authorization: Bearer \$(gcloud auth print-identity-token)'"
+print_status ""
+print_status "  # Check API"
+print_status "  curl '$API_URL/health'"
