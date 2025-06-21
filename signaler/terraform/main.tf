@@ -234,6 +234,34 @@ resource "google_monitoring_notification_channel" "email" {
   }
 }
 
+hcl# Add beta provider configuration (after the regular provider)
+provider "google-beta" {
+  project = var.project_id
+  region  = var.region
+  zone    = var.zone
+}
+
+# Update the vertex_ai module call to include both providers
+module "vertex_ai" {
+  source = "./modules/vertex_ai"
+
+  providers = {
+    google      = google
+    google-beta = google-beta
+  }
+
+  project_id      = var.project_id
+  region          = var.region
+  service_account = google_service_account.trading_system.email
+
+  training_config = {
+    machine_type      = "n1-standard-8"
+    accelerator_type  = "NVIDIA_TESLA_T4"
+    accelerator_count = 1
+    boot_disk_size_gb = 100
+  }
+}
+
 # Outputs
 output "bigquery_dataset" {
   value = module.bigquery.dataset_id

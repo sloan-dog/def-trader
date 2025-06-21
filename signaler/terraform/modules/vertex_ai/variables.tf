@@ -44,3 +44,29 @@ variable "labels" {
   type        = map(string)
   default     = {}
 }
+
+# This file should already exist, but make sure it has these variables
+variable "project_id" {
+  description = "GCP Project ID"
+  type        = string
+}
+
+variable "region" {
+  description = "GCP region for Vertex AI resources"
+  type        = string
+}
+
+variable "service_account" {
+  description = "Service account email for Vertex AI"
+  type        = string
+}
+
+variable "training_config" {
+  description = "Configuration for Vertex AI training"
+  type = object({
+    machine_type      = string
+    accelerator_type  = string
+    accelerator_count = number
+    boot_disk_size_gb = number
+  })
+}

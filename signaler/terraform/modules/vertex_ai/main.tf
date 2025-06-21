@@ -127,6 +127,44 @@ resource "google_notebooks_instance" "development" {
   service_account = var.service_account
 }
 
+terraform {
+  required_providers {
+    google = {
+      source                = "hashicorp/google"
+      version               = "~> 4.0"
+      configuration_aliases = [google]
+    }
+    google-beta = {
+      source                = "hashicorp/google-beta"
+      version               = "~> 4.0"
+      configuration_aliases = [google-beta]
+    }
+  }
+}
+
+# Metadata Store (using beta provider)
+resource "google_vertex_ai_metadata_store" "trading_signals" {
+  provider = google-beta
+
+  name        = "trading-signals-metadata"
+  description = "Metadata store for trading signal ML experiments"
+  region      = var.region
+}
+
+# Tensorboard instance for experiment visualization
+resource "google_vertex_ai_tensorboard" "experiments" {
+  provider = google-beta
+
+  display_name = "trading-signals-experiments"
+  description  = "Tensorboard for tracking GNN training experiments"
+  region       = var.region
+}
+
+# Outputs
+output "metadata_store_name" {
+  value = google_vertex_ai_metadata_store.trading_signals.name
+}
+
 # Outputs
 output "staging_bucket" {
   value       = google_storage_bucket.vertex_ai_staging.name
@@ -144,7 +182,7 @@ output "tensorboard_name" {
 }
 
 output "metadata_store_id" {
-  value       = google_vertex_ai_custom_job.default.id
+  value       = google_vertex_ai_metadata_store.default.id
   description = "ID of the Vertex AI Metadata Store"
 }
 
