@@ -144,7 +144,7 @@ output "tensorboard_name" {
 }
 
 output "metadata_store_id" {
-  value       = google_vertex_ai_metadata_store.default.id
+  value       = google_vertex_ai_custom_job.default.id
   description = "ID of the Vertex AI Metadata Store"
 }
 
