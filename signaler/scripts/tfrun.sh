@@ -31,16 +31,11 @@ if [ -f ".env" ]; then
 fi
 
 # Determine if using terraform or tofu
-if command -v tofu &> /dev/null; then
-    TF_CMD="tofu"
-    echo -e "${BLUE}Using OpenTofu${NC}"
-else
-    TF_CMD="terraform"
-    echo -e "${BLUE}Using Terraform${NC}"
-fi
+TF_CMD="tofu"
+echo -e "${BLUE}Using OpenTofu${NC}"
 
 # Change to terraform directory
-cd terraform
+cd ../terraform
 
 # If no arguments, show help
 if [ $# -eq 0 ]; then
@@ -62,4 +57,13 @@ fi
 echo -e "${GREEN}Running: $TF_CMD $@ -var-file=terraform.tfvars${NC}"
 echo
 
-$TF_CMD "$@" -var-file=terraform.tfvars
+# In tfrun.sh, modify the command execution part:
+
+# Check if this is an apply command with a plan file
+if [[ "$1" == "apply" ]] && [[ -f "$2" ]] && [[ "$2" == *.tfplan* || "$2" == tfplan-* ]]; then
+    # Don't add -var-file when applying a plan
+    $TF_CMD "$@"
+else
+    # Normal behavior - add -var-file
+    $TF_CMD "$@" -var-file=terraform.tfvars
+fi
