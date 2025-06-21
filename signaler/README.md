@@ -47,7 +47,7 @@ This system combines:
 - Google Cloud Platform account
 - Python 3.9+
 - Docker
-- Terraform
+- Open Tofu (Open source terraform)
 - Alpha Vantage API key
 
 ### Installation
@@ -88,7 +88,7 @@ Deploy the entire system with:
 This will:
 1. Enable required GCP APIs
 2. Build and push Docker images
-3. Deploy infrastructure with Terraform
+3. Deploy infrastructure with Terraform / Open Tofu
 4. Set up Cloud Run services
 5. Create scheduled jobs
 
