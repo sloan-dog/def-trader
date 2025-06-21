@@ -2,7 +2,7 @@
 
 # Terraform Minimal Setup for Local Development
 # This script creates only the essential GCP resources needed for local development
-# Later, you can run full terraform apply without any conflicts
+# Later, you can run full tofu apply without any conflicts
 
 set -e
 
@@ -38,7 +38,7 @@ echo
 # Check if terraform is initialized
 if [ ! -d ".terraform" ]; then
     print_info "Initializing Terraform..."
-    terraform init -backend-config=backend.conf
+    tofu init -backend-config=backend.conf
 else
     print_info "Terraform already initialized"
 fi
@@ -88,12 +88,12 @@ for target in "${TARGETS[@]}"; do
     TARGET_ARGS="$TARGET_ARGS -target=$target"
 done
 
-# Run terraform plan
-print_info "Running terraform plan..."
-if terraform plan -var-file=terraform.tfvars $TARGET_ARGS -out=tfplan-minimal; then
+# Run tofu plan
+print_info "Running tofu plan..."
+if tofu plan -var-file=terraform.tfvars $TARGET_ARGS -out=tfplan-minimal; then
     print_success "Plan created successfully"
 else
-    print_error "Terraform plan failed"
+    print_error "tofu plan failed"
     exit 1
 fi
 
@@ -101,18 +101,18 @@ echo
 read -p "Do you want to apply these changes? (yes/no): " confirm
 
 if [[ "$confirm" != "yes" ]]; then
-    print_warning "Terraform apply cancelled"
+    print_warning "tofu apply cancelled"
     rm -f tfplan-minimal
     exit 0
 fi
 
 # Apply the plan
-print_info "Applying terraform plan..."
-if terraform apply tfplan-minimal; then
-    print_success "Terraform apply completed successfully!"
+print_info "Applying tofu plan..."
+if tofu apply tfplan-minimal; then
+    print_success "tofu apply completed successfully!"
     rm -f tfplan-minimal
 else
-    print_error "Terraform apply failed"
+    print_error "tofu apply failed"
     rm -f tfplan-minimal
     exit 1
 fi
@@ -149,6 +149,6 @@ if [ -n "$SERVICE_ACCOUNT_EMAIL" ]; then
 fi
 
 print_info "💡 When ready to deploy full infrastructure, simply run:"
-echo "   terraform apply -var-file=terraform.tfvars"
+echo "   tofu apply -var-file=terraform.tfvars"
 echo
 echo "This will add the remaining resources (Cloud Run, Scheduler, etc.) without conflicts!"
