@@ -25,7 +25,7 @@ resource "google_vertex_ai_tensorboard" "training_tensorboard" {
 }
 
 # Vertex AI Metadata Store (for experiment tracking)
-resource "google_vertex_ai_metadata_store" "default" {
+resource "google_vertex_ai_custom_job" "default" {
   name        = "${var.project_id}-metadata-store"
   description = "Metadata store for ML experiments and artifacts"
   region      = var.region
@@ -91,6 +91,11 @@ resource "google_storage_bucket_iam_member" "vertex_ai_staging_access" {
 # Workbench Instance (optional - for development)
 resource "google_notebooks_instance" "development" {
   count = var.create_workbench_instance ? 1 : 0
+
+  vm_image {
+    project      = "deeplearning-platform-release"
+    image_family = "tf-latest-gpu"
+  }
 
   name         = "trading-signal-dev"
   location     = "${var.region}-a"

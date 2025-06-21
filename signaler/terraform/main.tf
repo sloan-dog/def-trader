@@ -114,7 +114,7 @@ resource "google_secret_manager_secret" "alpha_vantage_key" {
   secret_id = "alpha-vantage-api-key"
 
   replication {
-    automatic = true
+    auto {}
   }
 }
 
@@ -200,6 +200,7 @@ module "vertex_ai" {
 # Monitoring and alerting
 resource "google_monitoring_alert_policy" "job_failures" {
   display_name = "Trading System Job Failures"
+  combiner     = "OR"  # Added this line
 
   conditions {
     display_name = "Job failure rate"
