@@ -8,14 +8,27 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 4.0"
     }
+    google-beta = {
+      source  = "hashicorp/google-beta"
+      version = "~> 4.0"
+    }
   }
 
   backend "gcs" {
+    bucket = "trading-system-terraform-state"
+    prefix = "terraform/state"
   }
 }
 
 # Provider configuration
 provider "google" {
+  project = var.project_id
+  region  = var.region
+  zone    = var.zone
+}
+
+# Beta provider configuration for Vertex AI features
+provider "google-beta" {
   project = var.project_id
   region  = var.region
   zone    = var.zone
@@ -75,6 +88,27 @@ module "bigquery" {
   location   = var.bigquery_location
 }
 
+# Vertex AI resources including Metadata Store
+module "vertex_ai" {
+  source = "./modules/vertex_ai"
+
+  providers = {
+    google      = google
+    google-beta = google-beta
+  }
+
+  project_id      = var.project_id
+  region          = var.region
+  service_account = google_service_account.trading_system.email
+
+  training_config = {
+    machine_type      = "n1-standard-8"
+    accelerator_type  = "NVIDIA_TESLA_T4"
+    accelerator_count = 1
+    boot_disk_size_gb = 100
+  }
+}
+
 # Cloud Storage buckets
 resource "google_storage_bucket" "models" {
   name     = "${var.project_id}-model-registry"
@@ -114,7 +148,7 @@ resource "google_secret_manager_secret" "alpha_vantage_key" {
   secret_id = "alpha-vantage-api-key"
 
   replication {
-    auto {}
+    automatic = true
   }
 }
 
@@ -134,7 +168,7 @@ module "cloud_run" {
   services = {
     daily_ingestion = {
       name   = "daily-ingestion"
-      image  = "gcr.io/${var.project_id}/daily-ingestion:latest"
+      image  = "gcr.io/${var.project_id}/trading-system/daily-ingestion:latest"
       cpu    = "2"
       memory = "4Gi"
       env_vars = {
@@ -145,7 +179,7 @@ module "cloud_run" {
 
     prediction_service = {
       name   = "prediction-service"
-      image  = "gcr.io/${var.project_id}/prediction-service:latest"
+      image  = "gcr.io/${var.project_id}/trading-system/prediction-service:latest"
       cpu    = "4"
       memory = "8Gi"
       env_vars = {
@@ -181,26 +215,9 @@ module "cloud_scheduler" {
   }
 }
 
-# Vertex AI configuration
-module "vertex_ai" {
-  source = "./modules/vertex_ai"
-
-  project_id      = var.project_id
-  region          = var.region
-  service_account = google_service_account.trading_system.email
-
-  training_config = {
-    machine_type      = "n1-standard-8"
-    accelerator_type  = "NVIDIA_TESLA_T4"
-    accelerator_count = 1
-    boot_disk_size_gb = 100
-  }
-}
-
 # Monitoring and alerting
 resource "google_monitoring_alert_policy" "job_failures" {
   display_name = "Trading System Job Failures"
-  combiner     = "OR"  # Added this line
 
   conditions {
     display_name = "Job failure rate"
@@ -234,34 +251,6 @@ resource "google_monitoring_notification_channel" "email" {
   }
 }
 
-hcl# Add beta provider configuration (after the regular provider)
-provider "google-beta" {
-  project = var.project_id
-  region  = var.region
-  zone    = var.zone
-}
-
-# Update the vertex_ai module call to include both providers
-module "vertex_ai" {
-  source = "./modules/vertex_ai"
-
-  providers = {
-    google      = google
-    google-beta = google-beta
-  }
-
-  project_id      = var.project_id
-  region          = var.region
-  service_account = google_service_account.trading_system.email
-
-  training_config = {
-    machine_type      = "n1-standard-8"
-    accelerator_type  = "NVIDIA_TESLA_T4"
-    accelerator_count = 1
-    boot_disk_size_gb = 100
-  }
-}
-
 # Outputs
 output "bigquery_dataset" {
   value = module.bigquery.dataset_id
@@ -273,4 +262,12 @@ output "cloud_run_urls" {
 
 output "service_account_email" {
   value = google_service_account.trading_system.email
+}
+
+output "metadata_store_name" {
+  value = module.vertex_ai.metadata_store_name
+}
+
+output "tensorboard_name" {
+  value = module.vertex_ai.tensorboard_name
 }

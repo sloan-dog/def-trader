@@ -13,12 +13,14 @@ from pathlib import Path
 from loguru import logger
 import mlflow
 from sklearn.preprocessing import RobustScaler
+from google.cloud import aiplatform
 
 from config.settings import (
     MODEL_CONFIG,
     GNN_CONFIG,
     VALIDATION_CONFIG,
-    BQ_TABLES
+    BQ_TABLES,
+    VERTEX_AI_CONFIG
 )
 from src.models.temporal_gnn import TemporalGNN, StockGraphDataset
 from src.feature_engineering.graph_constructor import StockGraphConstructor
@@ -32,12 +34,13 @@ class GNNTrainer:
     def __init__(
             self,
             experiment_name: str = "temporal_gnn_trading",
-            mlflow_uri: str = None
+            mlflow_uri: str = None,
+            use_vertex_ai: bool = True
     ):
         """Initialize trainer."""
         self.bq_client = BigQueryClient()
         self.graph_constructor = StockGraphConstructor()
-        self.metrics = ModelMetrics()
+        self.metrics_calculator = ModelMetrics()
 
         # Model configuration
         self.model_config = MODEL_CONFIG
@@ -48,6 +51,21 @@ class GNNTrainer:
         if mlflow_uri:
             mlflow.set_tracking_uri(mlflow_uri)
         mlflow.set_experiment(experiment_name)
+
+        # Vertex AI setup
+        self.use_vertex_ai = use_vertex_ai
+        if use_vertex_ai:
+            try:
+                aiplatform.init(
+                    project=VERTEX_AI_CONFIG['project'],
+                    location=VERTEX_AI_CONFIG['location'],
+                    experiment=VERTEX_AI_CONFIG['experiment'],
+                    experiment_description=VERTEX_AI_CONFIG['experiment_description']
+                )
+                logger.info("Vertex AI Metadata Store initialized")
+            except Exception as e:
+                logger.warning(f"Could not initialize Vertex AI: {e}")
+                self.use_vertex_ai = False
 
         # Device setup
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -275,7 +293,7 @@ class GNNTrainer:
                 targets = np.concatenate(all_targets[horizon])
                 confs = np.concatenate(all_confidences[horizon])
 
-                horizon_metrics = self.metrics.calculate_metrics(
+                horizon_metrics = self.metrics_calculator.calculate_metrics(
                     preds, targets, confs
                 )
 
@@ -293,14 +311,38 @@ class GNNTrainer:
             learning_rate: float = None,
             batch_size: int = None
     ) -> Dict:
-        """Main training loop."""
+        """Main training loop with Vertex AI tracking."""
         num_epochs = num_epochs or self.model_config['num_epochs']
         learning_rate = learning_rate or self.model_config['learning_rate']
         batch_size = batch_size or self.model_config['batch_size']
 
+        # Start Vertex AI run if enabled
+        vertex_run = None
+        if self.use_vertex_ai:
+            run_id = f"gnn-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+            vertex_run = aiplatform.start_run(run=run_id, resume=False)
+
+            # Log parameters
+            vertex_run.log_params({
+                'model_type': 'temporal_gnn',
+                'num_epochs': num_epochs,
+                'learning_rate': learning_rate,
+                'batch_size': batch_size,
+                'historical_window': self.model_config['historical_window'],
+                'hidden_dim': self.gnn_config['hidden_dim'],
+                'num_gnn_layers': self.gnn_config['num_gnn_layers'],
+                'num_temporal_layers': self.gnn_config['num_temporal_layers'],
+                'dropout_rate': self.gnn_config['dropout_rate'],
+                'device': str(self.device),
+                'num_train_samples': len(train_df),
+                'num_val_samples': len(val_df),
+                'num_features': len(self.feature_columns),
+                'prediction_horizons': str(self.model_config['prediction_horizons'])
+            })
+
         # Start MLflow run
         with mlflow.start_run():
-            # Log parameters
+            # Log parameters to MLflow too
             mlflow.log_params({
                 'num_epochs': num_epochs,
                 'learning_rate': learning_rate,
@@ -381,13 +423,31 @@ class GNNTrainer:
                 else:
                     patience_counter += 1
 
-                # Log metrics
-                mlflow.log_metrics({
+                # Prepare metrics for logging
+                metrics_dict = {
+                    'epoch': epoch,
                     'train_loss': train_losses['total_loss'],
                     'val_loss': val_loss,
+                    'learning_rate': optimizer.param_groups[0]['lr'],
                     **{f'train_{k}': v for k, v in train_losses.items()},
                     **{f'val_{k}': v for k, v in val_metrics.items()}
-                }, step=epoch)
+                }
+
+                # Log to MLflow
+                mlflow.log_metrics(metrics_dict, step=epoch)
+
+                # Log to Vertex AI
+                if vertex_run:
+                    vertex_run.log_metrics(metrics_dict)
+
+                    # Log time series for Tensorboard
+                    vertex_run.log_time_series_metrics({
+                        'loss/train': train_losses['total_loss'],
+                        'loss/validation': val_loss,
+                        'metrics/direction_accuracy': val_metrics.get('1d_direction_accuracy', 0),
+                        'metrics/sharpe_ratio': val_metrics.get('7d_sharpe_ratio', 0),
+                        'learning_rate': optimizer.param_groups[0]['lr']
+                    })
 
                 # Log progress
                 if epoch % 10 == 0:
@@ -408,9 +468,41 @@ class GNNTrainer:
             # Final evaluation
             final_metrics = self.evaluate(model, val_dataset, val_dates)
 
-            # Log final metrics
+            # Log final metrics to MLflow
             for metric, value in final_metrics.items():
                 mlflow.log_metric(f'final_{metric}', value)
+
+            # Log to Vertex AI
+            if vertex_run:
+                # Log final metrics
+                vertex_run.log_metrics({
+                    f'final_{metric}': value
+                    for metric, value in final_metrics.items()
+                })
+
+                # Log model artifact
+                model_path = self._save_model_to_gcs(model)
+
+                vertex_run.log_model(
+                    model,
+                    artifact_id=f"temporal-gnn-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
+                    uri=model_path,
+                    metadata={
+                        'framework': 'pytorch',
+                        'framework_version': torch.__version__,
+                        'model_class': 'TemporalGNN',
+                        'input_features': len(self.feature_columns),
+                        'prediction_horizons': self.model_config['prediction_horizons'],
+                        'best_val_loss': float(best_val_loss),
+                        'final_metrics': final_metrics,
+                        'feature_columns': self.feature_columns,
+                        'graph_nodes': len(graph_structure),
+                        'graph_edges': sum(len(edges) for edges in graph_structure.values())
+                    }
+                )
+
+                # End run
+                vertex_run.end_run()
 
             # Save model artifacts
             self.save_training_artifacts(model)
@@ -418,8 +510,36 @@ class GNNTrainer:
             return {
                 'model': model,
                 'final_metrics': final_metrics,
-                'best_val_loss': best_val_loss
+                'best_val_loss': best_val_loss,
+                'vertex_ai_run': vertex_run.resource_name if vertex_run else None
             }
+
+    def _save_model_to_gcs(self, model: TemporalGNN) -> str:
+        """Save model to GCS and return path."""
+        from google.cloud import storage
+
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        gcs_path = f"gs://{self.model_config['model_registry_bucket']}/models/temporal_gnn_{timestamp}.pth"
+
+        # Save locally first
+        local_path = f"/tmp/model_{timestamp}.pth"
+        torch.save({
+            'model_state_dict': model.state_dict(),
+            'model_config': self.model_config,
+            'gnn_config': self.gnn_config,
+            'feature_columns': self.feature_columns
+        }, local_path)
+
+        # Upload to GCS
+        storage_client = storage.Client()
+        bucket_name = self.model_config['model_registry_bucket']
+        blob_name = f"models/temporal_gnn_{timestamp}.pth"
+
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(blob_name)
+        blob.upload_from_filename(local_path)
+
+        return gcs_path
 
     def save_model(self, model: TemporalGNN, filename: str):
         """Save model checkpoint."""
@@ -477,6 +597,18 @@ class GNNTrainer:
         """Run complete training pipeline."""
         logger.info("Starting full training pipeline")
 
+        # Log to Vertex AI experiment
+        if self.use_vertex_ai:
+            run_params = {
+                'pipeline_type': 'full_training',
+                'start_date': start_date,
+                'end_date': end_date,
+                'data_version': f"{start_date}_to_{end_date}"
+            }
+
+            if hasattr(self, 'vertex_experiment_run'):
+                self.vertex_experiment_run.log_params(run_params)
+
         # Prepare data
         features_df, graph_structure = self.prepare_training_data(
             start_date, end_date
@@ -515,7 +647,8 @@ class GNNTrainer:
         return {
             'model': training_results['model'],
             'val_metrics': training_results['final_metrics'],
-            'test_metrics': test_metrics
+            'test_metrics': test_metrics,
+            'vertex_ai_run': training_results.get('vertex_ai_run')
         }
 
     def _store_model_metadata(
@@ -537,7 +670,8 @@ class GNNTrainer:
                 **self.model_config,
                 **self.gnn_config
             }),
-            'model_path': f'gs://models/{model_version}',
+            'model_path': f'gs://{self.model_config["model_registry_bucket"]}/models/{model_version}',
+            'vertex_ai_run': training_results.get('vertex_ai_run'),
             'created_at': datetime.now()
         }
 

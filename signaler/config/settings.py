@@ -67,6 +67,17 @@ GNN_CONFIG = {
     "attention_heads": 4,
 }
 
+# Vertex AI settings
+VERTEX_AI_CONFIG = {
+    "location": GCP_REGION,
+    "project": GCP_PROJECT_ID,
+    "experiment": "temporal-gnn-trading",
+    "experiment_description": "GNN-based trading signal predictions with multi-horizon forecasting",
+    "metadata_store": f"projects/{GCP_PROJECT_ID}/locations/{GCP_REGION}/metadataStores/trading-signals-metadata",
+    "tensorboard": f"projects/{GCP_PROJECT_ID}/locations/{GCP_REGION}/tensorboards/trading-signals-experiments",
+    "staging_bucket": f"gs://{GCP_PROJECT_ID}-vertex-staging",
+}
+
 # Technical indicators settings
 TECHNICAL_INDICATORS = {
     "rsi": {"period": 14},
@@ -131,7 +142,7 @@ CLOUD_RUN_CONFIG = {
 }
 
 # Vertex AI training settings
-VERTEX_AI_CONFIG = {
+VERTEX_AI_TRAINING_CONFIG = {
     "machine_type": "n1-standard-8",
     "accelerator_type": "NVIDIA_TESLA_T4",
     "accelerator_count": 1,

@@ -2,7 +2,7 @@
 
 # Terraform Minimal Setup for Local Development
 # This script creates only the essential GCP resources needed for local development
-# Later, you can run full tofu apply without any conflicts
+# Later, you can run full terraform apply without any conflicts
 
 set -e
 
@@ -38,7 +38,7 @@ echo
 # Check if terraform is initialized
 if [ ! -d ".terraform" ]; then
     print_info "Initializing Terraform..."
-    tofu init -backend-config=backend.conf
+    terraform init -backend-config=backend.conf -upgrade
 else
     print_info "Terraform already initialized"
 fi
@@ -54,6 +54,7 @@ TARGETS=(
     "google_project_service.required_apis[\"bigquery.googleapis.com\"]"
     "google_project_service.required_apis[\"storage.googleapis.com\"]"
     "google_project_service.required_apis[\"secretmanager.googleapis.com\"]"
+    "google_project_service.required_apis[\"aiplatform.googleapis.com\"]"
 
     # Service account for authentication
     "google_service_account.trading_system"
@@ -63,6 +64,7 @@ TARGETS=(
     "google_project_iam_member.service_account_roles[\"roles/bigquery.jobUser\"]"
     "google_project_iam_member.service_account_roles[\"roles/storage.objectAdmin\"]"
     "google_project_iam_member.service_account_roles[\"roles/secretmanager.secretAccessor\"]"
+    "google_project_iam_member.service_account_roles[\"roles/aiplatform.user\"]"
 
     # BigQuery dataset and all tables
     "module.bigquery"
@@ -71,8 +73,12 @@ TARGETS=(
     "google_secret_manager_secret.alpha_vantage_key"
     "google_secret_manager_secret_version.alpha_vantage_key"
 
-    # Model storage bucket (optional but useful)
+    # Model storage bucket
     "google_storage_bucket.models"
+
+    # Vertex AI Metadata Store and Tensorboard
+    "module.vertex_ai.google_vertex_ai_metadata_store.trading_signals"
+    "module.vertex_ai.google_vertex_ai_tensorboard.experiments"
 )
 
 print_info "Planning to create the following resources:"
@@ -88,12 +94,12 @@ for target in "${TARGETS[@]}"; do
     TARGET_ARGS="$TARGET_ARGS -target=$target"
 done
 
-# Run tofu plan
-print_info "Running tofu plan..."
-if tofu plan -var-file=terraform.tfvars $TARGET_ARGS -out=tfplan-minimal; then
+# Run terraform plan
+print_info "Running terraform plan..."
+if terraform plan -var-file=terraform.tfvars $TARGET_ARGS -out=tfplan-minimal; then
     print_success "Plan created successfully"
 else
-    print_error "tofu plan failed"
+    print_error "Terraform plan failed"
     exit 1
 fi
 
@@ -101,32 +107,33 @@ echo
 read -p "Do you want to apply these changes? (yes/no): " confirm
 
 if [[ "$confirm" != "yes" ]]; then
-    print_warning "tofu apply cancelled"
+    print_warning "Terraform apply cancelled"
     rm -f tfplan-minimal
     exit 0
 fi
 
 # Apply the plan
-print_info "Applying tofu plan..."
-if tofu apply tfplan-minimal; then
-    print_success "tofu apply completed successfully!"
+print_info "Applying terraform plan..."
+if terraform apply tfplan-minimal; then
+    print_success "Terraform apply completed successfully!"
     rm -f tfplan-minimal
 else
-    print_error "tofu apply failed"
+    print_error "Terraform apply failed"
     rm -f tfplan-minimal
     exit 1
 fi
 
 echo
 print_info "📊 Resources created:"
-terraform state list | grep -E "(bigquery|service_account|secret)" || true
+terraform state list | grep -E "(bigquery|service_account|secret|vertex_ai)" || true
 
 echo
 print_success "✅ Minimal infrastructure created!"
 echo
 
-# Get service account email
+# Get outputs
 SERVICE_ACCOUNT_EMAIL=$(terraform output -raw service_account_email 2>/dev/null || echo "")
+METADATA_STORE_NAME=$(terraform output -raw metadata_store_name 2>/dev/null || echo "")
 
 if [ -n "$SERVICE_ACCOUNT_EMAIL" ]; then
     print_info "📋 Next steps:"
@@ -141,14 +148,18 @@ if [ -n "$SERVICE_ACCOUNT_EMAIL" ]; then
     echo "3. Add to your .env file:"
     echo "   echo 'GOOGLE_APPLICATION_CREDENTIALS=\$HOME/trading-system-key.json' >> ../.env"
     echo
-    echo "4. Test your setup:"
-    echo "   python ../test_setup.py"
+    if [ -n "$METADATA_STORE_NAME" ]; then
+        echo "4. Vertex AI Metadata Store created: $METADATA_STORE_NAME"
+        echo
+    fi
+    echo "5. Test your setup:"
+    echo "   python ../scripts/test_metadata_store.py"
     echo
-    echo "5. Run data ingestion:"
+    echo "6. Run data ingestion:"
     echo "   python -m src.jobs.backfill_job --start-date 2024-01-01 --end-date 2024-01-31"
 fi
 
 print_info "💡 When ready to deploy full infrastructure, simply run:"
-echo "   tofu apply -var-file=terraform.tfvars"
+echo "   terraform apply -var-file=terraform.tfvars"
 echo
 echo "This will add the remaining resources (Cloud Run, Scheduler, etc.) without conflicts!"
