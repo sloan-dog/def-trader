@@ -5,6 +5,11 @@ variable "project_id" {
   type        = string
 }
 
+variable "service_account_email" {
+  description = "Service account email to use for BigQuery operations"
+  type        = string
+}
+
 variable "dataset_id" {
   description = "BigQuery dataset ID"
   type        = string

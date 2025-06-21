@@ -83,9 +83,10 @@ resource "google_project_iam_member" "service_account_roles" {
 module "bigquery" {
   source = "./modules/bigquery"
 
-  project_id = var.project_id
-  dataset_id = var.bigquery_dataset
-  location   = var.bigquery_location
+  project_id            = var.project_id
+  dataset_id            = var.bigquery_dataset
+  location              = var.bigquery_location
+  service_account_email = google_service_account.trading_system.email
 }
 
 # Vertex AI resources including Metadata Store
@@ -148,7 +149,7 @@ resource "google_secret_manager_secret" "alpha_vantage_key" {
   secret_id = "alpha-vantage-api-key"
 
   replication {
-    automatic = true
+    auto {}
   }
 }
 
@@ -218,7 +219,7 @@ module "cloud_scheduler" {
 # Monitoring and alerting
 resource "google_monitoring_alert_policy" "job_failures" {
   display_name = "Trading System Job Failures"
-
+  combiner = "OR"
   conditions {
     display_name = "Job failure rate"
 

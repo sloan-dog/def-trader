@@ -12,20 +12,13 @@ resource "google_bigquery_dataset" "trading_signals" {
 
   access {
     role          = "OWNER"
-    user_by_email = google_service_account.bigquery_admin.email
+    user_by_email = var.service_account_email  # Use the passed-in service account
   }
 
   access {
     role          = "READER"
     special_group = "projectReaders"
   }
-}
-
-# Service account for BigQuery operations
-resource "google_service_account" "bigquery_admin" {
-  account_id   = "bigquery-admin"
-  display_name = "BigQuery Admin"
-  description  = "Service account for BigQuery administrative tasks"
 }
 
 # Tables
