@@ -11,8 +11,6 @@ terraform {
   }
 
   backend "gcs" {
-    bucket = "trading-system-terraform-state"
-    prefix = "terraform/state"
   }
 }
 
