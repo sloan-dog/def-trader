@@ -13,6 +13,7 @@ from src.feature_engineering.technical_indicators import TechnicalIndicatorCalcu
 from src.feature_engineering.temporal_features import TemporalFeatureEngineer
 from src.utils.bigquery_client import BigQueryClient
 from config.settings import load_stocks_config, BQ_TABLES
+from typing import Dict
 
 
 class BackfillJob:

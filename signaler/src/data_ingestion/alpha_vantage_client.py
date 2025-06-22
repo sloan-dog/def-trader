@@ -61,6 +61,8 @@ class AlphaVantageClient:
 
             data = response.json()
 
+            logger.debug(f"ticker data: {data}")
+
             # Check for API errors
             if "Error Message" in data:
                 raise ValueError(f"API Error: {data['Error Message']}")
