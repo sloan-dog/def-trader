@@ -18,6 +18,22 @@ technology:
     name: NVIDIA Corporation
     market_cap: large
     sub_industry: semiconductors
+  - ticker: META
+    name: Meta Platforms Inc.
+    market_cap: large
+    sub_industry: social_media
+  - ticker: AVGO
+    name: Broadcom Inc.
+    market_cap: large
+    sub_industry: semiconductors
+  - ticker: ORCL
+    name: Oracle Corporation
+    market_cap: large
+    sub_industry: software
+  - ticker: ADBE
+    name: Adobe Inc.
+    market_cap: large
+    sub_industry: software
 
 financials:
   - ticker: JPM
@@ -36,6 +52,22 @@ financials:
     name: Berkshire Hathaway Inc.
     market_cap: large
     sub_industry: multi_sector_holdings
+  - ticker: WFC
+    name: Wells Fargo & Company
+    market_cap: large
+    sub_industry: diversified_banks
+  - ticker: MS
+    name: Morgan Stanley
+    market_cap: large
+    sub_industry: investment_banking
+  - ticker: C
+    name: Citigroup Inc.
+    market_cap: large
+    sub_industry: diversified_banks
+  - ticker: BLK
+    name: BlackRock Inc.
+    market_cap: large
+    sub_industry: asset_management
 
 healthcare:
   - ticker: JNJ
@@ -54,6 +86,22 @@ healthcare:
     name: AbbVie Inc.
     market_cap: large
     sub_industry: pharmaceuticals
+  - ticker: LLY
+    name: Eli Lilly and Company
+    market_cap: large
+    sub_industry: pharmaceuticals
+  - ticker: MRK
+    name: Merck & Co. Inc.
+    market_cap: large
+    sub_industry: pharmaceuticals
+  - ticker: CVS
+    name: CVS Health Corporation
+    market_cap: large
+    sub_industry: healthcare_services
+  - ticker: TMO
+    name: Thermo Fisher Scientific
+    market_cap: large
+    sub_industry: life_sciences_tools
 
 consumer_discretionary:
   - ticker: AMZN
@@ -72,6 +120,22 @@ consumer_discretionary:
     name: McDonald's Corporation
     market_cap: large
     sub_industry: restaurants
+  - ticker: NKE
+    name: Nike Inc.
+    market_cap: large
+    sub_industry: apparel
+  - ticker: SBUX
+    name: Starbucks Corporation
+    market_cap: large
+    sub_industry: restaurants
+  - ticker: LOW
+    name: Lowe's Companies Inc.
+    market_cap: large
+    sub_industry: home_improvement_retail
+  - ticker: TGT
+    name: Target Corporation
+    market_cap: large
+    sub_industry: general_merchandise
 
 energy:
   - ticker: XOM
@@ -90,6 +154,22 @@ energy:
     name: Schlumberger Limited
     market_cap: large
     sub_industry: oil_gas_equipment
+  - ticker: EOG
+    name: EOG Resources Inc.
+    market_cap: large
+    sub_industry: oil_gas_exploration
+  - ticker: OXY
+    name: Occidental Petroleum
+    market_cap: large
+    sub_industry: oil_gas_exploration
+  - ticker: PXD
+    name: Pioneer Natural Resources
+    market_cap: large
+    sub_industry: oil_gas_exploration
+  - ticker: MPC
+    name: Marathon Petroleum Corp
+    market_cap: large
+    sub_industry: oil_gas_refining
 
 industrials:
   - ticker: CAT
@@ -106,6 +186,22 @@ industrials:
     sub_industry: air_freight_logistics
   - ticker: HON
     name: Honeywell International Inc.
+    market_cap: large
+    sub_industry: industrial_conglomerates
+  - ticker: RTX
+    name: Raytheon Technologies
+    market_cap: large
+    sub_industry: aerospace_defense
+  - ticker: LMT
+    name: Lockheed Martin Corporation
+    market_cap: large
+    sub_industry: aerospace_defense
+  - ticker: DE
+    name: Deere & Company
+    market_cap: large
+    sub_industry: agricultural_machinery
+  - ticker: GE
+    name: General Electric Company
     market_cap: large
     sub_industry: industrial_conglomerates
 
@@ -126,6 +222,22 @@ consumer_staples:
     name: PepsiCo Inc.
     market_cap: large
     sub_industry: soft_drinks
+  - ticker: COST
+    name: Costco Wholesale Corporation
+    market_cap: large
+    sub_industry: hypermarkets_super_centers
+  - ticker: MDLZ
+    name: Mondelez International Inc.
+    market_cap: large
+    sub_industry: packaged_foods
+  - ticker: PM
+    name: Philip Morris International
+    market_cap: large
+    sub_industry: tobacco
+  - ticker: CL
+    name: Colgate-Palmolive Company
+    market_cap: large
+    sub_industry: household_products
 
 utilities:
   - ticker: NEE
@@ -144,6 +256,22 @@ utilities:
     name: Dominion Energy Inc.
     market_cap: large
     sub_industry: multi_utilities
+  - ticker: AEP
+    name: American Electric Power
+    market_cap: large
+    sub_industry: electric_utilities
+  - ticker: SRE
+    name: Sempra Energy
+    market_cap: large
+    sub_industry: multi_utilities
+  - ticker: EXC
+    name: Exelon Corporation
+    market_cap: large
+    sub_industry: electric_utilities
+  - ticker: XEL
+    name: Xcel Energy Inc.
+    market_cap: large
+    sub_industry: electric_utilities
 
 materials:
   - ticker: LIN
@@ -162,6 +290,22 @@ materials:
     name: Newmont Corporation
     market_cap: large
     sub_industry: gold
+  - ticker: FCX
+    name: Freeport-McMoRan Inc.
+    market_cap: large
+    sub_industry: copper
+  - ticker: SHW
+    name: Sherwin-Williams Company
+    market_cap: large
+    sub_industry: specialty_chemicals
+  - ticker: DD
+    name: DuPont de Nemours Inc.
+    market_cap: large
+    sub_industry: diversified_chemicals
+  - ticker: DOW
+    name: Dow Inc.
+    market_cap: large
+    sub_industry: commodity_chemicals
 
 real_estate:
   - ticker: PLD
@@ -180,8 +324,171 @@ real_estate:
     name: Equinix Inc.
     market_cap: large
     sub_industry: specialized_reits
+  - ticker: PSA
+    name: Public Storage
+    market_cap: large
+    sub_industry: specialized_reits
+  - ticker: SPG
+    name: Simon Property Group Inc.
+    market_cap: large
+    sub_industry: retail_reits
+  - ticker: O
+    name: Realty Income Corporation
+    market_cap: large
+    sub_industry: retail_reits
+  - ticker: WELL
+    name: Welltower Inc.
+    market_cap: large
+    sub_industry: healthcare_reits
 
-# Market indices for benchmarking
+communication_services:
+  - ticker: VZ
+    name: Verizon Communications Inc.
+    market_cap: large
+    sub_industry: telecom_services
+  - ticker: T
+    name: AT&T Inc.
+    market_cap: large
+    sub_industry: telecom_services
+  - ticker: TMUS
+    name: T-Mobile US Inc.
+    market_cap: large
+    sub_industry: telecom_services
+  - ticker: DIS
+    name: Walt Disney Company
+    market_cap: large
+    sub_industry: entertainment
+  - ticker: NFLX
+    name: Netflix Inc.
+    market_cap: large
+    sub_industry: entertainment
+  - ticker: CMCSA
+    name: Comcast Corporation
+    market_cap: large
+    sub_industry: cable_satellite
+  - ticker: CHTR
+    name: Charter Communications
+    market_cap: large
+    sub_industry: cable_satellite
+  - ticker: EA
+    name: Electronic Arts Inc.
+    market_cap: large
+    sub_industry: interactive_entertainment
+
+# Cryptocurrency proxies and blockchain
+crypto:
+  - ticker: COIN
+    name: Coinbase Global Inc.
+    market_cap: large
+    sub_industry: crypto_exchange
+  - ticker: MSTR
+    name: MicroStrategy Inc.
+    market_cap: mid
+    sub_industry: bitcoin_proxy
+  - ticker: RIOT
+    name: Riot Platforms Inc.
+    market_cap: mid
+    sub_industry: bitcoin_mining
+  - ticker: MARA
+    name: Marathon Digital Holdings
+    market_cap: mid
+    sub_industry: bitcoin_mining
+  - ticker: SQ
+    name: Block Inc. (Square)
+    market_cap: large
+    sub_industry: digital_payments_crypto
+  - ticker: PYPL
+    name: PayPal Holdings Inc.
+    market_cap: large
+    sub_industry: digital_payments_crypto
+  - ticker: GBTC
+    name: Grayscale Bitcoin Trust
+    market_cap: etf
+    sub_industry: bitcoin_trust
+  - ticker: ETHE
+    name: Grayscale Ethereum Trust
+    market_cap: etf
+    sub_industry: ethereum_trust
+
+# Fixed Income and Stable Assets
+fixed_income:
+  - ticker: AGG
+    name: iShares Core US Aggregate Bond ETF
+    market_cap: etf
+    sub_industry: total_bond_market
+  - ticker: BND
+    name: Vanguard Total Bond Market ETF
+    market_cap: etf
+    sub_industry: total_bond_market
+  - ticker: TLT
+    name: iShares 20+ Year Treasury Bond ETF
+    market_cap: etf
+    sub_industry: long_term_treasuries
+  - ticker: IEF
+    name: iShares 7-10 Year Treasury Bond ETF
+    market_cap: etf
+    sub_industry: intermediate_treasuries
+  - ticker: SHY
+    name: iShares 1-3 Year Treasury Bond ETF
+    market_cap: etf
+    sub_industry: short_term_treasuries
+  - ticker: LQD
+    name: iShares iBoxx Investment Grade Corporate Bond ETF
+    market_cap: etf
+    sub_industry: investment_grade_corporate
+  - ticker: HYG
+    name: iShares iBoxx High Yield Corporate Bond ETF
+    market_cap: etf
+    sub_industry: high_yield_corporate
+  - ticker: TIP
+    name: iShares TIPS Bond ETF
+    market_cap: etf
+    sub_industry: inflation_protected
+  - ticker: MUB
+    name: iShares National Muni Bond ETF
+    market_cap: etf
+    sub_industry: municipal_bonds
+  - ticker: VTEB
+    name: Vanguard Tax-Exempt Bond ETF
+    market_cap: etf
+    sub_industry: municipal_bonds
+
+# Commodities
+commodities:
+  - ticker: GLD
+    name: SPDR Gold Shares
+    market_cap: etf
+    sub_industry: gold_etf
+  - ticker: SLV
+    name: iShares Silver Trust
+    market_cap: etf
+    sub_industry: silver_etf
+  - ticker: USO
+    name: United States Oil Fund
+    market_cap: etf
+    sub_industry: oil_etf
+  - ticker: UNG
+    name: United States Natural Gas Fund
+    market_cap: etf
+    sub_industry: natural_gas_etf
+  - ticker: DBA
+    name: Invesco DB Agriculture Fund
+    market_cap: etf
+    sub_industry: agriculture_etf
+  - ticker: DBB
+    name: Invesco DB Base Metals Fund
+    market_cap: etf
+    sub_industry: base_metals_etf
+  - ticker: PDBC
+    name: Invesco Optimum Yield Diversified Commodity
+    market_cap: etf
+    sub_industry: broad_commodity_etf
+  - ticker: DJP
+    name: iPath Bloomberg Commodity Index ETN
+    market_cap: etf
+    sub_industry: broad_commodity_etf
+
+# Market indices and sector ETFs for benchmarking
 indices:
   - ticker: SPY
     name: SPDR S&P 500 ETF
@@ -199,3 +506,51 @@ indices:
     name: iShares Russell 2000 ETF
     market_cap: etf
     sub_industry: small_cap_etf
+  - ticker: VTI
+    name: Vanguard Total Stock Market ETF
+    market_cap: etf
+    sub_industry: total_market_etf
+  - ticker: VOO
+    name: Vanguard S&P 500 ETF
+    market_cap: etf
+    sub_industry: broad_market_etf
+  - ticker: EFA
+    name: iShares MSCI EAFE ETF
+    market_cap: etf
+    sub_industry: international_developed_etf
+  - ticker: EEM
+    name: iShares MSCI Emerging Markets ETF
+    market_cap: etf
+    sub_industry: emerging_markets_etf
+  - ticker: VNQ
+    name: Vanguard Real Estate ETF
+    market_cap: etf
+    sub_industry: real_estate_etf
+  - ticker: XLF
+    name: Financial Select Sector SPDR Fund
+    market_cap: etf
+    sub_industry: financials_etf
+  - ticker: XLK
+    name: Technology Select Sector SPDR Fund
+    market_cap: etf
+    sub_industry: technology_etf
+  - ticker: XLE
+    name: Energy Select Sector SPDR Fund
+    market_cap: etf
+    sub_industry: energy_etf
+  - ticker: XLV
+    name: Health Care Select Sector SPDR Fund
+    market_cap: etf
+    sub_industry: healthcare_etf
+  - ticker: XLI
+    name: Industrial Select Sector SPDR Fund
+    market_cap: etf
+    sub_industry: industrials_etf
+  - ticker: XLY
+    name: Consumer Discretionary Select Sector SPDR
+    market_cap: etf
+    sub_industry: consumer_discretionary_etf
+  - ticker: XLP
+    name: Consumer Staples Select Sector SPDR
+    market_cap: etf
+    sub_industry: consumer_staples_etf
