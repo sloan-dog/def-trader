@@ -11,7 +11,7 @@ import json
 from src.training.trainer import GNNTrainer
 from src.training.prediction_pipeline import PredictionPipeline
 from src.training.metrics import ModelMetrics
-from src.utils.bigquery_client import BigQueryClient
+from src.utils.bigquery import BigQueryClient
 from config.settings import MODEL_CONFIG, BQ_TABLES
 
 

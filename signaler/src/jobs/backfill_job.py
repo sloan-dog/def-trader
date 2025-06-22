@@ -11,7 +11,7 @@ from src.data_ingestion.ohlcv_fetcher import OHLCVFetcher
 from src.data_ingestion.macro_data_fetcher import MacroDataFetcher
 from src.feature_engineering.technical_indicators import TechnicalIndicatorCalculator
 from src.feature_engineering.temporal_features import TemporalFeatureEngineer
-from src.utils.bigquery_client import BigQueryClient
+from src.utils.bigquery import BigQueryClient
 from config.settings import load_stocks_config, BQ_TABLES
 from typing import Dict
 

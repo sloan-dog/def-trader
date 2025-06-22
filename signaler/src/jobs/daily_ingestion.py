@@ -13,7 +13,7 @@ from src.data_ingestion.alpha_vantage_client import AlphaVantageClient
 from src.feature_engineering.technical_indicators import TechnicalIndicatorCalculator
 from src.feature_engineering.temporal_features import TemporalFeatureEngineer
 from src.feature_engineering.graph_constructor import StockGraphConstructor
-from src.utils.bigquery_client import BigQueryClient
+from src.utils.bigquery import BigQueryClient
 from config.settings import BQ_TABLES, load_stocks_config
 
 

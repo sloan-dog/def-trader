@@ -195,7 +195,7 @@ docker-clean:
 
 # BigQuery operations
 bq-init:
-	python -c "from src.utils.bigquery_client import BigQueryClient; BigQueryClient().create_dataset_if_not_exists(); BigQueryClient().create_tables()"
+	python -c "from src.utils.bigquery import BigQueryClient; BigQueryClient().create_dataset_if_not_exists(); BigQueryClient().create_tables()"
 
 bq-validate:
 	python -c "from src.data_ingestion.data_validator import DataValidator; print('Data validation completed')"

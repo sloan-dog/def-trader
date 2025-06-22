@@ -9,7 +9,7 @@ import time
 
 from config.settings import MACRO_INDICATORS, BQ_TABLES
 from src.data_ingestion.alpha_vantage_client import AlphaVantageClient
-from src.utils.bigquery_client import BigQueryClient
+from src.utils.bigquery import BigQueryClient
 
 
 class MacroDataFetcher:

@@ -1,0 +1,201 @@
+"""
+Core BigQuery operations for data manipulation.
+"""
+from typing import List, Optional, Dict, Any
+import pandas as pd
+from google.cloud import bigquery
+from loguru import logger
+
+from config.settings import BQ_TABLES, INGESTION_CONFIG
+from .base import BigQueryBase
+from .utils import retry_on_error
+
+
+class BigQueryOperations(BigQueryBase):
+    """BigQuery operations for data insertion and querying."""
+
+    @retry_on_error()
+    def insert_dataframe(
+            self,
+            df: pd.DataFrame,
+            table_name: str,
+            chunk_size: Optional[int] = None,
+            if_exists: str = 'append'
+    ) -> None:
+        """
+        Insert DataFrame to BigQuery table.
+
+        Args:
+            df: DataFrame to insert
+            table_name: Target table name
+            chunk_size: Number of rows per chunk
+            if_exists: How to behave if table exists ('append' or 'replace')
+        """
+        table_id = BQ_TABLES.get(table_name, f"{self.dataset_ref}.{table_name}")
+        chunk_size = chunk_size or INGESTION_CONFIG['chunk_size']
+
+        # Add insertion timestamp if not present
+        if 'inserted_at' not in df.columns:
+            df['inserted_at'] = pd.Timestamp.now()
+
+        # Insert in chunks
+        total_rows = len(df)
+        rows_inserted = 0
+
+        for i in range(0, total_rows, chunk_size):
+            chunk = df.iloc[i:i + chunk_size]
+
+            job_config = bigquery.LoadJobConfig(
+                write_disposition=(
+                    bigquery.WriteDisposition.WRITE_APPEND
+                    if if_exists == 'append'
+                    else bigquery.WriteDisposition.WRITE_TRUNCATE
+                )
+            )
+
+            job = self.client.load_table_from_dataframe(
+                chunk, table_id, job_config=job_config
+            )
+            job.result()  # Wait for job to complete
+
+            rows_inserted += len(chunk)
+            logger.info(f"Inserted {rows_inserted}/{total_rows} rows to {table_id}")
+
+    @retry_on_error()
+    def query(
+            self,
+            query: str,
+            params: Optional[List[bigquery.ScalarQueryParameter]] = None,
+            use_cache: bool = True
+    ) -> pd.DataFrame:
+        """
+        Execute query and return results as DataFrame.
+
+        Args:
+            query: SQL query to execute
+            params: Query parameters
+            use_cache: Whether to use query cache
+
+        Returns:
+            Query results as DataFrame
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=params or [],
+            use_query_cache=use_cache
+        )
+
+        query_job = self.client.query(query, job_config=job_config)
+        results = query_job.result()
+
+        return results.to_dataframe()
+
+    def get_latest_date(self, table_name: str, ticker: Optional[str] = None) -> Optional[pd.Timestamp]:
+        """
+        Get the latest date for a ticker in a table.
+
+        Args:
+            table_name: Table name
+            ticker: Optional ticker to filter by
+
+        Returns:
+            Latest date or None if no data
+        """
+        table_id = BQ_TABLES.get(table_name, f"{self.dataset_ref}.{table_name}")
+
+        query = f"""
+        SELECT MAX(date) as latest_date
+        FROM `{table_id}`
+        """
+
+        if ticker:
+            query += f" WHERE ticker = '{ticker}'"
+
+        try:
+            result = self.query(query)
+            if not result.empty and result['latest_date'].iloc[0]:
+                return pd.Timestamp(result['latest_date'].iloc[0])
+        except Exception as e:
+            logger.warning(f"Could not get latest date: {e}")
+
+        return None
+
+    def batch_insert(
+            self,
+            records: List[Dict[str, Any]],
+            table_name: str,
+            batch_size: int = 1000
+    ) -> int:
+        """
+        Insert records in batches.
+
+        Args:
+            records: List of records to insert
+            table_name: Target table name
+            batch_size: Records per batch
+
+        Returns:
+            Number of records inserted
+        """
+        if not records:
+            return 0
+
+        df = pd.DataFrame(records)
+        self.insert_dataframe(df, table_name, chunk_size=batch_size)
+        return len(records)
+
+    def stream_insert(
+            self,
+            rows: List[Dict[str, Any]],
+            table_name: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Stream insert rows to BigQuery.
+
+        Args:
+            rows: List of rows to insert
+            table_name: Target table name
+
+        Returns:
+            List of errors if any
+        """
+        table_ref = self.get_table_reference(table_name)
+        table = self.client.get_table(table_ref)
+
+        errors = self.client.insert_rows_json(table, rows)
+
+        if errors:
+            logger.error(f"Stream insert errors: {errors}")
+        else:
+            logger.info(f"Streamed {len(rows)} rows to {table_name}")
+
+        return errors
+
+    def delete_data(
+            self,
+            table_name: str,
+            where_clause: str
+    ) -> int:
+        """
+        Delete data from table based on where clause.
+
+        Args:
+            table_name: Table name
+            where_clause: WHERE clause for deletion
+
+        Returns:
+            Number of rows deleted
+        """
+        table_id = BQ_TABLES.get(table_name, f"{self.dataset_ref}.{table_name}")
+
+        query = f"""
+        DELETE FROM `{table_id}`
+        WHERE {where_clause}
+        """
+
+        query_job = self.client.query(query)
+        query_job.result()
+
+        rows_deleted = query_job.num_dml_affected_rows
+        logger.info(f"Deleted {rows_deleted} rows from {table_name}")
+
+        return rows_deleted

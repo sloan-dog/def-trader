@@ -12,7 +12,7 @@ import os
 import numpy as np  # Add this line
 
 from src.training.prediction_pipeline import PredictionPipeline, RealTimePredictionService
-from src.utils.bigquery_client import BigQueryClient
+from src.utils.bigquery import BigQueryClient
 from config.settings import BQ_TABLES
 
 

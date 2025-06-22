@@ -14,7 +14,7 @@ from loguru import logger
 from config.settings import BQ_TABLES, MODEL_CONFIG
 from src.models.temporal_gnn import TemporalGNN, StockGraphDataset
 from src.feature_engineering.graph_constructor import StockGraphConstructor
-from src.utils.bigquery_client import BigQueryClient
+from src.utils.bigquery import BigQueryClient
 
 
 class PredictionPipeline:

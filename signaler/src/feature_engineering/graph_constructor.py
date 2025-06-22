@@ -10,7 +10,7 @@ import networkx as nx
 import json
 
 from config.settings import FEATURE_CONFIG, load_stocks_config
-from src.utils.bigquery_client import BigQueryClient
+from src.utils.bigquery import BigQueryClient
 
 
 class StockGraphConstructor:
