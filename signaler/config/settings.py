@@ -41,7 +41,7 @@ BQ_TABLES = {
 # Alpha Vantage settings
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY", "")
 ALPHA_VANTAGE_BASE_URL = "https://www.alphavantage.co/query"
-ALPHA_VANTAGE_RATE_LIMIT = 5  # calls per minute for free tier
+ALPHA_VANTAGE_RATE_LIMIT = 75  # Premium tier - 75 calls per minute
 ALPHA_VANTAGE_TIMEOUT = 30  # seconds
 
 # Model settings

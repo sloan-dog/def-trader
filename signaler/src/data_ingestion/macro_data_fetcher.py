@@ -59,8 +59,8 @@ class MacroDataFetcher:
                 else:
                     logger.warning(f"No data returned for {indicator}")
 
-                # Rate limiting
-                time.sleep(12)  # 5 calls per minute limit
+                # Remove this line - rate limiting is handled in the client
+                # time.sleep(12)  # 5 calls per minute limit
 
             except Exception as e:
                 logger.error(f"Failed to fetch {indicator}: {e}")
