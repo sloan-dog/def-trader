@@ -14,6 +14,7 @@ from src.feature_engineering.temporal_features import TemporalFeatureEngineer
 from src.utils.bigquery import BigQueryClient
 from config.settings import load_stocks_config, BQ_TABLES
 from typing import Dict
+import pandas as pd
 
 
 class BackfillJob:
@@ -178,13 +179,15 @@ class BackfillJob:
             end_date: str,
             batch_size: int
     ) -> Dict:
-        """Backfill OHLCV data."""
+        """Backfill OHLCV data with duplicate prevention and incremental support."""
         stats = {
             'success': True,
             'total_tickers': 0,
             'successful_tickers': 0,
             'failed_tickers': [],
-            'total_records': 0
+            'total_records': 0,
+            'skipped_records': 0,
+            'new_records': 0
         }
 
         try:
@@ -201,27 +204,58 @@ class BackfillJob:
                 batch_tickers = all_tickers[i:i + batch_size]
                 logger.info(f"Processing batch {i//batch_size + 1}: {batch_tickers}")
 
-                # Fetch data
-                data = self.ohlcv_fetcher.fetch_historical_data(
-                    start_date=start_date,
-                    end_date=end_date,
-                    tickers=batch_tickers
-                )
-
-                # Store data
-                for ticker, df in data.items():
+                # Process each ticker individually for better control
+                for ticker in batch_tickers:
                     try:
-                        if not df.empty:
-                            self.bq_client.insert_dataframe(
-                                df,
-                                'raw_ohlcv',
-                                if_exists='append'
-                            )
+                        # Get existing data date ranges
+                        existing_dates = self._get_existing_dates(
+                            ticker, 'raw_ohlcv', start_date, end_date
+                        )
+
+                        # Find missing date ranges
+                        missing_ranges = self._find_missing_date_ranges(
+                            existing_dates, start_date, end_date
+                        )
+
+                        if not missing_ranges:
+                            logger.info(f"No missing data for {ticker} in date range")
                             stats['successful_tickers'] += 1
-                            stats['total_records'] += len(df)
-                            logger.info(f"Stored {len(df)} records for {ticker}")
+                            continue
+
+                        # Fetch only missing data
+                        total_ticker_records = 0
+                        for range_start, range_end in missing_ranges:
+                            logger.info(f"Fetching {ticker} for {range_start} to {range_end}")
+
+                            # Fetch data for this range
+                            data = self.ohlcv_fetcher.fetch_historical_data(
+                                start_date=range_start,
+                                end_date=range_end,
+                                tickers=[ticker]
+                            )
+
+                            # Store data if fetched successfully
+                            if ticker in data and not data[ticker].empty:
+                                df = data[ticker]
+
+                                # Additional check to prevent duplicates
+                                df = self._remove_duplicate_dates(df, ticker, 'raw_ohlcv')
+
+                                if not df.empty:
+                                    self.bq_client.insert_dataframe(
+                                        df,
+                                        'raw_ohlcv',
+                                        if_exists='append'
+                                    )
+                                    total_ticker_records += len(df)
+                                    stats['new_records'] += len(df)
+                                    logger.info(f"Stored {len(df)} records for {ticker}")
+
+                        stats['successful_tickers'] += 1
+                        stats['total_records'] += total_ticker_records
+
                     except Exception as e:
-                        logger.error(f"Failed to store {ticker}: {e}")
+                        logger.error(f"Failed to process {ticker}: {e}")
                         stats['failed_tickers'].append(ticker)
 
                 # Rate limiting between batches
@@ -241,11 +275,12 @@ class BackfillJob:
             start_date: str,
             end_date: str
     ) -> Dict:
-        """Backfill technical indicators."""
+        """Backfill technical indicators with duplicate prevention."""
         stats = {
             'success': True,
             'tickers_processed': 0,
-            'total_records': 0
+            'total_records': 0,
+            'new_records': 0
         }
 
         try:
@@ -260,7 +295,22 @@ class BackfillJob:
 
             for ticker in tickers_df['ticker']:
                 try:
-                    # Get OHLCV data
+                    # Check existing indicator data
+                    existing_dates = self._get_existing_dates(
+                        ticker, 'technical_indicators', start_date, end_date
+                    )
+
+                    # Find missing date ranges
+                    missing_ranges = self._find_missing_date_ranges(
+                        existing_dates, start_date, end_date
+                    )
+
+                    if not missing_ranges:
+                        logger.info(f"No missing indicators for {ticker}")
+                        stats['tickers_processed'] += 1
+                        continue
+
+                    # Get OHLCV data (need extra days for indicator calculation)
                     query = f"""
                     SELECT *
                     FROM `{BQ_TABLES['raw_ohlcv']}`
@@ -282,11 +332,12 @@ class BackfillJob:
                         ticker=ticker
                     )
 
-                    # Filter to date range
+                    # Filter to only missing dates
                     indicators_df = indicators_df[
-                        (indicators_df['date'] >= start_date) &
-                        (indicators_df['date'] <= end_date)
-                        ]
+                        indicators_df['date'].isin(
+                            self._get_dates_from_ranges(missing_ranges)
+                        )
+                    ]
 
                     # Store to BigQuery
                     if not indicators_df.empty:
@@ -297,6 +348,8 @@ class BackfillJob:
                         )
                         stats['tickers_processed'] += 1
                         stats['total_records'] += len(indicators_df)
+                        stats['new_records'] += len(indicators_df)
+                        logger.info(f"Stored {len(indicators_df)} new indicators for {ticker}")
 
                 except Exception as e:
                     logger.error(f"Failed to process indicators for {ticker}: {e}")
@@ -313,6 +366,19 @@ class BackfillJob:
     def _backfill_macro(self) -> bool:
         """Backfill macro economic data."""
         try:
+            # Check if we already have recent macro data
+            query = f"""
+            SELECT MAX(date) as latest_date
+            FROM `{BQ_TABLES['macro_data']}`
+            """
+
+            result = self.bq_client.query(query)
+            if not result.empty and result['latest_date'].iloc[0]:
+                latest_date = pd.to_datetime(result['latest_date'].iloc[0])
+                if (datetime.now() - latest_date).days < 7:
+                    logger.info("Macro data is up to date")
+                    return True
+
             # Fetch all indicators
             indicator_data = self.macro_fetcher.fetch_all_indicators()
 
@@ -323,8 +389,22 @@ class BackfillJob:
                 # Calculate composite indicators
                 wide_df = self.macro_fetcher.calculate_composite_indicators(wide_df)
 
+                # Remove duplicates before storing
+                if self.bq_client.table_exists('macro_data'):
+                    existing_dates_query = f"""
+                    SELECT DISTINCT date
+                    FROM `{BQ_TABLES['macro_data']}`
+                    """
+                    existing_dates = self.bq_client.query(existing_dates_query)['date'].tolist()
+                    wide_df = wide_df[~wide_df['date'].isin(existing_dates)]
+                    logger.info(f"Filtered out {len(existing_dates)} existing dates")
+
                 # Store to BigQuery
-                return self.macro_fetcher.store_to_bigquery(wide_df)
+                if not wide_df.empty:
+                    return self.macro_fetcher.store_to_bigquery(wide_df)
+                else:
+                    logger.info("No new macro data to store")
+                    return True
 
             return False
 
@@ -335,6 +415,24 @@ class BackfillJob:
     def _backfill_temporal(self, start_date: str, end_date: str) -> bool:
         """Backfill temporal features."""
         try:
+            # Check existing temporal features
+            if self.bq_client.table_exists('temporal_features'):
+                query = f"""
+                SELECT MIN(date) as min_date, MAX(date) as max_date
+                FROM `{BQ_TABLES['temporal_features']}`
+                """
+                result = self.bq_client.query(query)
+
+                if not result.empty and result['min_date'].iloc[0]:
+                    existing_start = pd.to_datetime(result['min_date'].iloc[0])
+                    existing_end = pd.to_datetime(result['max_date'].iloc[0])
+
+                    # Check if we need to backfill
+                    if (existing_start <= pd.to_datetime(start_date) and
+                            existing_end >= pd.to_datetime(end_date)):
+                        logger.info("Temporal features already exist for date range")
+                        return True
+
             # Extend date range to include future dates for predictions
             extended_end = (
                     datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=90)
@@ -348,6 +446,125 @@ class BackfillJob:
         except Exception as e:
             logger.error(f"Temporal backfill failed: {e}")
             return False
+
+    def _get_existing_dates(
+            self,
+            ticker: str,
+            table_name: str,
+            start_date: str,
+            end_date: str
+    ) -> list:
+        """Get list of existing dates for a ticker in a table."""
+        try:
+            if not self.bq_client.table_exists(table_name):
+                return []
+
+            query = f"""
+            SELECT DISTINCT date
+            FROM `{BQ_TABLES[table_name]}`
+            WHERE ticker = '{ticker}'
+              AND date BETWEEN '{start_date}' AND '{end_date}'
+            ORDER BY date
+            """
+
+            result = self.bq_client.query(query)
+            if result.empty:
+                return []
+
+            return pd.to_datetime(result['date']).dt.strftime('%Y-%m-%d').tolist()
+
+        except Exception as e:
+            logger.warning(f"Error getting existing dates: {e}")
+            return []
+
+    def _find_missing_date_ranges(
+            self,
+            existing_dates: list,
+            start_date: str,
+            end_date: str
+    ) -> list:
+        """Find missing date ranges given existing dates."""
+        if not existing_dates:
+            return [(start_date, end_date)]
+
+        # Convert to datetime for comparison
+        existing_dates = pd.to_datetime(existing_dates)
+        start_dt = pd.to_datetime(start_date)
+        end_dt = pd.to_datetime(end_date)
+
+        # Create full date range
+        full_range = pd.date_range(start=start_dt, end=end_dt, freq='D')
+
+        # Find missing dates
+        missing_dates = full_range.difference(existing_dates)
+
+        if missing_dates.empty:
+            return []
+
+        # Convert to ranges
+        ranges = []
+        current_start = None
+
+        for i in range(len(missing_dates)):
+            if current_start is None:
+                current_start = missing_dates[i]
+
+            # Check if next date is consecutive
+            if i == len(missing_dates) - 1 or (missing_dates[i+1] - missing_dates[i]).days > 1:
+                ranges.append((
+                    current_start.strftime('%Y-%m-%d'),
+                    missing_dates[i].strftime('%Y-%m-%d')
+                ))
+                current_start = None
+
+        return ranges
+
+    def _get_dates_from_ranges(self, date_ranges: list) -> list:
+        """Convert date ranges to list of dates."""
+        all_dates = []
+
+        for start_date, end_date in date_ranges:
+            dates = pd.date_range(
+                start=start_date,
+                end=end_date,
+                freq='D'
+            )
+            all_dates.extend(dates)
+
+        return all_dates
+
+    def _remove_duplicate_dates(
+            self,
+            df: pd.DataFrame,
+            ticker: str,
+            table_name: str
+    ) -> pd.DataFrame:
+        """Remove dates that already exist in BigQuery."""
+        try:
+            if not self.bq_client.table_exists(table_name):
+                return df
+
+            # Get existing dates for this ticker
+            dates_str = "', '".join(df['date'].dt.strftime('%Y-%m-%d'))
+            query = f"""
+            SELECT DISTINCT date
+            FROM `{BQ_TABLES[table_name]}`
+            WHERE ticker = '{ticker}'
+              AND date IN ('{dates_str}')
+            """
+
+            existing_df = self.bq_client.query(query)
+
+            if not existing_df.empty:
+                existing_dates = pd.to_datetime(existing_df['date'])
+                df = df[~df['date'].isin(existing_dates)]
+                logger.info(f"Filtered out {len(existing_dates)} duplicate dates for {ticker}")
+
+            return df
+
+        except Exception as e:
+            logger.warning(f"Error checking duplicates: {e}")
+            return df
 
     def _print_summary(self, results: Dict):
         """Print backfill summary."""
@@ -366,10 +583,12 @@ class BackfillJob:
                     logger.info(f"  {step}: {'SUCCESS' if success else 'FAILED'}")
 
                     if step == 'ohlcv' and 'total_records' in stats:
-                        logger.info(f"    - Records: {stats['total_records']:,}")
+                        logger.info(f"    - Total records: {stats['total_records']:,}")
+                        logger.info(f"    - New records: {stats['new_records']:,}")
                         logger.info(f"    - Tickers: {stats['successful_tickers']}/{stats['total_tickers']}")
                     elif step == 'indicators' and 'total_records' in stats:
-                        logger.info(f"    - Records: {stats['total_records']:,}")
+                        logger.info(f"    - Total records: {stats['total_records']:,}")
+                        logger.info(f"    - New records: {stats['new_records']:,}")
                         logger.info(f"    - Tickers: {stats['tickers_processed']}")
 
         logger.info("=" * 60)

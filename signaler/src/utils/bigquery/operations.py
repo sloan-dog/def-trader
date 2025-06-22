@@ -20,16 +20,18 @@ class BigQueryOperations(BigQueryBase):
             df: pd.DataFrame,
             table_name: str,
             chunk_size: Optional[int] = None,
-            if_exists: str = 'append'
+            if_exists: str = 'append',
+            merge_keys: Optional[List[str]] = None
     ) -> None:
         """
-        Insert DataFrame to BigQuery table.
+        Insert DataFrame to BigQuery table with support for merge operations.
 
         Args:
             df: DataFrame to insert
             table_name: Target table name
             chunk_size: Number of rows per chunk
-            if_exists: How to behave if table exists ('append' or 'replace')
+            if_exists: How to behave if table exists ('append', 'replace', or 'merge')
+            merge_keys: List of columns to use as merge keys (for deduplication)
         """
         table_id = BQ_TABLES.get(table_name, f"{self.dataset_ref}.{table_name}")
         chunk_size = chunk_size or INGESTION_CONFIG['chunk_size']
@@ -38,28 +40,67 @@ class BigQueryOperations(BigQueryBase):
         if 'inserted_at' not in df.columns:
             df['inserted_at'] = pd.Timestamp.now()
 
-        # Insert in chunks
-        total_rows = len(df)
-        rows_inserted = 0
+        # If merge operation is requested
+        if if_exists == 'merge' and merge_keys:
+            # Use a temporary table for merge
+            temp_table_id = f"{table_id}_temp_{pd.Timestamp.now().strftime('%Y%m%d%H%M%S')}"
 
-        for i in range(0, total_rows, chunk_size):
-            chunk = df.iloc[i:i + chunk_size]
-
+            # Load data to temporary table first
             job_config = bigquery.LoadJobConfig(
-                write_disposition=(
-                    bigquery.WriteDisposition.WRITE_APPEND
-                    if if_exists == 'append'
-                    else bigquery.WriteDisposition.WRITE_TRUNCATE
-                )
+                write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE
             )
 
             job = self.client.load_table_from_dataframe(
-                chunk, table_id, job_config=job_config
+                df, temp_table_id, job_config=job_config
             )
-            job.result()  # Wait for job to complete
+            job.result()
 
-            rows_inserted += len(chunk)
-            logger.info(f"Inserted {rows_inserted}/{total_rows} rows to {table_id}")
+            # Perform merge operation
+            merge_keys_str = ', '.join([f't.{key} = s.{key}' for key in merge_keys])
+            update_cols = [col for col in df.columns if col not in merge_keys]
+            update_str = ', '.join([f't.{col} = s.{col}' for col in update_cols])
+
+            merge_query = f"""
+            MERGE `{table_id}` t
+            USING `{temp_table_id}` s
+            ON {merge_keys_str}
+            WHEN MATCHED THEN
+                UPDATE SET {update_str}
+            WHEN NOT MATCHED THEN
+                INSERT ({', '.join(df.columns)})
+                VALUES ({', '.join([f's.{col}' for col in df.columns])})
+            """
+
+            self.client.query(merge_query).result()
+
+            # Drop temporary table
+            self.client.delete_table(temp_table_id)
+
+            logger.info(f"Merged {len(df)} rows into {table_id}")
+
+        else:
+            # Standard insert operation
+            total_rows = len(df)
+            rows_inserted = 0
+
+            for i in range(0, total_rows, chunk_size):
+                chunk = df.iloc[i:i + chunk_size]
+
+                job_config = bigquery.LoadJobConfig(
+                    write_disposition=(
+                        bigquery.WriteDisposition.WRITE_APPEND
+                        if if_exists == 'append'
+                        else bigquery.WriteDisposition.WRITE_TRUNCATE
+                    )
+                )
+
+                job = self.client.load_table_from_dataframe(
+                    chunk, table_id, job_config=job_config
+                )
+                job.result()  # Wait for job to complete
+
+                rows_inserted += len(chunk)
+                logger.info(f"Inserted {rows_inserted}/{total_rows} rows to {table_id}")
 
     @retry_on_error()
     def query(

@@ -146,7 +146,7 @@ class OHLCVFetcher:
             validate: bool = True
     ) -> Dict[str, bool]:
         """
-        Store OHLCV data to BigQuery.
+        Store OHLCV data to BigQuery with duplicate prevention.
 
         Args:
             data_dict: Dictionary of DataFrames by ticker
@@ -169,15 +169,50 @@ class OHLCVFetcher:
                 # Ensure required columns
                 df = self._prepare_for_storage(df)
 
-                # Store to BigQuery
-                self.bq_client.insert_dataframe(
-                    df,
-                    'raw_ohlcv',
-                    chunk_size=INGESTION_CONFIG['chunk_size']
-                )
+                # Check for existing data to prevent duplicates
+                if self.bq_client.table_exists('raw_ohlcv') and not df.empty:
+                    # Get date range from dataframe
+                    min_date = df['date'].min()
+                    max_date = df['date'].max()
 
-                results[ticker] = True
-                logger.info(f"Stored {len(df)} records for {ticker}")
+                    # Query existing dates
+                    query = f"""
+                    SELECT DISTINCT date
+                    FROM `{BQ_TABLES['raw_ohlcv']}`
+                    WHERE ticker = '{ticker}'
+                      AND date BETWEEN '{min_date}' AND '{max_date}'
+                    """
+
+                    existing_dates_df = self.bq_client.query(query)
+
+                    if not existing_dates_df.empty:
+                        existing_dates = pd.to_datetime(existing_dates_df['date']).dt.date
+                        initial_count = len(df)
+                        df = df[~df['date'].isin(existing_dates)]
+                        removed_count = initial_count - len(df)
+
+                        if removed_count > 0:
+                            logger.info(f"Filtered out {removed_count} duplicate dates for {ticker}")
+
+                        if df.empty:
+                            logger.info(f"All data for {ticker} already exists, skipping")
+                            results[ticker] = True
+                            continue
+
+                # Store to BigQuery
+                if not df.empty:
+                    self.bq_client.insert_dataframe(
+                        df,
+                        'raw_ohlcv',
+                        chunk_size=INGESTION_CONFIG['chunk_size'],
+                        if_exists='append'
+                    )
+
+                    results[ticker] = True
+                    logger.info(f"Stored {len(df)} records for {ticker}")
+                else:
+                    results[ticker] = True
+                    logger.info(f"No new data to store for {ticker}")
 
             except Exception as e:
                 logger.error(f"Failed to store data for {ticker}: {e}")
