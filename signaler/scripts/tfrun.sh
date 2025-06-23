@@ -53,17 +53,19 @@ if [ $# -eq 0 ]; then
     exit 0
 fi
 
-# Run terraform with var file
-echo -e "${GREEN}Running: $TF_CMD $@ -var-file=terraform.tfvars${NC}"
-echo
-
-# In tfrun.sh, modify the command execution part:
-
 # Check if this is an apply command with a plan file
-if [[ "$1" == "apply" ]] && [[ -f "$2" ]] && [[ "$2" == *.tfplan* || "$2" == tfplan-* ]]; then
-    # Don't add -var-file when applying a plan
+# A plan file is being used if:
+# 1. The command is "apply"
+# 2. There's a second argument that is a file (not a flag starting with -)
+# 3. The file exists
+if [[ "$1" == "apply" ]] && [[ $# -ge 2 ]] && [[ "$2" != -* ]] && [[ -f "$2" ]]; then
+    # Applying a plan file - don't add -var-file
+    echo -e "${GREEN}Applying saved plan: $2${NC}"
+    echo
     $TF_CMD "$@"
 else
-    # Normal behavior - add -var-file
+    # Normal command - add -var-file
+    echo -e "${GREEN}Running: $TF_CMD $@ -var-file=terraform.tfvars${NC}"
+    echo
     $TF_CMD "$@" -var-file=terraform.tfvars
 fi

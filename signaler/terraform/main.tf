@@ -192,8 +192,12 @@ module "cloud_run" {
 }
 
 # Cloud Scheduler jobs
+# Cloud Scheduler jobs
 module "cloud_scheduler" {
   source = "./modules/cloud_scheduler"
+
+  # Add explicit dependency on Cloud Run module
+  depends_on = [module.cloud_run]
 
   project_id      = var.project_id
   region          = var.region
@@ -201,17 +205,23 @@ module "cloud_scheduler" {
 
   jobs = {
     daily_ingestion = {
-      name     = "daily-data-ingestion"
-      schedule = "0 18 * * MON-FRI"  # 6 PM EST on weekdays
-      timezone = "America/New_York"
-      target_url = module.cloud_run.service_urls["daily_ingestion"]
+      name        = "daily-data-ingestion"
+      schedule    = "0 18 * * MON-FRI"  # 6 PM EST on weekdays
+      timezone    = "America/New_York"
+      target_url  = try(module.cloud_run.service_urls["daily_ingestion"], "https://placeholder-url")
+      description = "Daily market data ingestion job"
+      retry_count = 3
+      max_retry_duration = "600s"
     }
 
     weekly_training = {
-      name     = "weekly-model-training"
-      schedule = "0 2 * * SUN"  # 2 AM EST on Sundays
-      timezone = "America/New_York"
-      target_url = "${module.cloud_run.service_urls["prediction_service"]}/train"
+      name        = "weekly-model-training"
+      schedule    = "0 2 * * SUN"  # 2 AM EST on Sundays
+      timezone    = "America/New_York"
+      target_url  = try("${module.cloud_run.service_urls["prediction_service"]}/train", "https://placeholder-url")
+      description = "Weekly model training job"
+      retry_count = 1
+      max_retry_duration = "3600s"
     }
   }
 }

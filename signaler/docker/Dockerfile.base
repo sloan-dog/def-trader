@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy pyproject.toml first for better Docker layer caching
-COPY pyproject.toml setup.cfg ./
+COPY pyproject.toml ./
 
 # Upgrade pip and install build tools
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel

@@ -10,20 +10,25 @@ resource "google_cloud_scheduler_job" "jobs" {
   time_zone   = each.value.timezone
   region      = var.region
 
+  # Always include retry_config with defaults
   retry_config {
-    retry_count          = lookup(each.value, "retry_count", 3)
-    max_retry_duration   = lookup(each.value, "max_retry_duration", "600s")
-    min_backoff_duration = lookup(each.value, "min_backoff_duration", "5s")
-    max_backoff_duration = lookup(each.value, "max_backoff_duration", "600s")
+    retry_count          = coalesce(lookup(each.value, "retry_count", null), 3)
+    max_retry_duration   = coalesce(lookup(each.value, "max_retry_duration", null), "600s")
+    min_backoff_duration = coalesce(lookup(each.value, "min_backoff_duration", null), "5s")
+    max_backoff_duration = coalesce(lookup(each.value, "max_backoff_duration", null), "600s")
+    max_doublings        = 5
   }
 
   http_target {
     uri         = each.value.target_url
     http_method = lookup(each.value, "http_method", "POST")
 
-    headers = lookup(each.value, "headers", {
-      "Content-Type" = "application/json"
-    })
+    headers = merge(
+      {
+        "Content-Type" = "application/json"
+      },
+      lookup(each.value, "headers", {})
+    )
 
     # Body for the request if needed
     body = lookup(each.value, "body", null) != null ? base64encode(each.value.body) : null
