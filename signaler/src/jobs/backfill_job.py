@@ -13,7 +13,7 @@ from src.feature_engineering.technical_indicators import TechnicalIndicatorCalcu
 from src.feature_engineering.temporal_features import TemporalFeatureEngineer
 from src.utils.bigquery import BigQueryClient
 from config.settings import load_stocks_config, BQ_TABLES
-from typing import Dict
+from typing import Dict, List, Tuple
 import pandas as pd
 
 
@@ -179,7 +179,9 @@ class BackfillJob:
             end_date: str,
             batch_size: int
     ) -> Dict:
-        """Backfill OHLCV data with duplicate prevention and incremental support."""
+        """Backfill HOURLY OHLCV data with duplicate prevention and incremental support."""
+        logger.info(f"Starting HOURLY OHLCV backfill from {start_date} to {end_date}")
+
         stats = {
             'success': True,
             'total_tickers': 0,
@@ -187,7 +189,9 @@ class BackfillJob:
             'failed_tickers': [],
             'total_records': 0,
             'skipped_records': 0,
-            'new_records': 0
+            'new_records': 0,
+            'api_calls': 0,
+            'data_frequency': 'hourly'
         }
 
         try:
@@ -199,6 +203,15 @@ class BackfillJob:
 
             stats['total_tickers'] = len(all_tickers)
 
+            # Calculate expected API calls for hourly data
+            start = pd.to_datetime(start_date)
+            end = pd.to_datetime(end_date)
+            months_needed = len(pd.date_range(start=start, end=end, freq='MS'))
+            expected_api_calls = len(all_tickers) * months_needed
+
+            logger.info(f"Expected API calls: {expected_api_calls}")
+            logger.info(f"Estimated time with 75 RPM: {expected_api_calls / 75:.1f} minutes")
+
             # Process in batches
             for i in range(0, len(all_tickers), batch_size):
                 batch_tickers = all_tickers[i:i + batch_size]
@@ -207,64 +220,76 @@ class BackfillJob:
                 # Process each ticker individually for better control
                 for ticker in batch_tickers:
                     try:
-                        # Get existing data date ranges
-                        existing_dates = self._get_existing_dates(
-                            ticker, 'raw_ohlcv', start_date, end_date
+                        # Get existing hourly data date ranges
+                        existing_hours = self._get_existing_hourly_data(
+                            ticker, start_date, end_date
                         )
 
-                        # Find missing date ranges
-                        missing_ranges = self._find_missing_date_ranges(
-                            existing_dates, start_date, end_date
+                        # Find missing months
+                        missing_months = self._find_missing_months_hourly(
+                            existing_hours, start_date, end_date
                         )
 
-                        if not missing_ranges:
-                            logger.info(f"No missing data for {ticker} in date range")
+                        if not missing_months:
+                            logger.info(f"No missing hourly data for {ticker} in date range")
                             stats['successful_tickers'] += 1
                             continue
 
-                        # Fetch only missing data
+                        # Fetch only missing months
                         total_ticker_records = 0
-                        for range_start, range_end in missing_ranges:
-                            logger.info(f"Fetching {ticker} for {range_start} to {range_end}")
+                        for month in missing_months:
+                            try:
+                                logger.info(f"Fetching {ticker} hourly data for {month}")
 
-                            # Fetch data for this range
-                            data = self.ohlcv_fetcher.fetch_historical_data(
-                                start_date=range_start,
-                                end_date=range_end,
-                                tickers=[ticker]
-                            )
+                                # Fetch hourly data for this month
+                                month_data = self.ohlcv_fetcher.av_client.get_hourly_ohlcv(
+                                    ticker,
+                                    month=month
+                                )
 
-                            # Store data if fetched successfully
-                            if ticker in data and not data[ticker].empty:
-                                df = data[ticker]
+                                stats['api_calls'] += 1
 
-                                # Additional check to prevent duplicates
-                                df = self._remove_duplicate_dates(df, ticker, 'raw_ohlcv')
+                                # Filter to date range
+                                if not month_data.empty:
+                                    month_data = month_data[
+                                        (month_data['date'] >= pd.to_datetime(start_date).date()) &
+                                        (month_data['date'] <= pd.to_datetime(end_date).date())
+                                        ]
 
-                                if not df.empty:
-                                    self.bq_client.insert_dataframe(
-                                        df,
-                                        'raw_ohlcv',
-                                        if_exists='append'
+                                    # Additional check to prevent duplicates
+                                    month_data = self._remove_duplicate_hourly_data(
+                                        month_data, ticker
                                     )
-                                    total_ticker_records += len(df)
-                                    stats['new_records'] += len(df)
-                                    logger.info(f"Stored {len(df)} records for {ticker}")
+
+                                    if not month_data.empty:
+                                        # Store to BigQuery
+                                        self.bq_client.insert_dataframe(
+                                            month_data,
+                                            'raw_ohlcv_hourly',
+                                            if_exists='append'
+                                        )
+                                        total_ticker_records += len(month_data)
+                                        stats['new_records'] += len(month_data)
+                                        logger.info(f"Stored {len(month_data)} hourly records for {ticker} in {month}")
+
+                            except Exception as e:
+                                logger.error(f"Failed to fetch {ticker} for {month}: {e}")
 
                         stats['successful_tickers'] += 1
                         stats['total_records'] += total_ticker_records
+                        logger.info(f"Completed {ticker}: {total_ticker_records} total hourly records")
 
                     except Exception as e:
                         logger.error(f"Failed to process {ticker}: {e}")
                         stats['failed_tickers'].append(ticker)
 
-                # Rate limiting between batches
-                time.sleep(60)
-
             stats['success'] = len(stats['failed_tickers']) < stats['total_tickers'] * 0.1
 
+            logger.info(f"HOURLY backfill completed: {stats['successful_tickers']}/{stats['total_tickers']} tickers")
+            logger.info(f"Total API calls made: {stats['api_calls']}")
+
         except Exception as e:
-            logger.error(f"OHLCV backfill failed: {e}")
+            logger.error(f"HOURLY OHLCV backfill failed: {e}")
             stats['success'] = False
             stats['error'] = str(e)
 
@@ -275,19 +300,20 @@ class BackfillJob:
             start_date: str,
             end_date: str
     ) -> Dict:
-        """Backfill technical indicators with duplicate prevention."""
+        """Backfill technical indicators for HOURLY data."""
         stats = {
             'success': True,
             'tickers_processed': 0,
             'total_records': 0,
-            'new_records': 0
+            'new_records': 0,
+            'data_frequency': 'hourly'
         }
 
         try:
-            # Get unique tickers with OHLCV data
+            # Get unique tickers with hourly OHLCV data
             query = f"""
             SELECT DISTINCT ticker
-            FROM `{BQ_TABLES['raw_ohlcv']}`
+            FROM `{BQ_TABLES['raw_ohlcv_hourly']}`
             WHERE date BETWEEN '{start_date}' AND '{end_date}'
             """
 
@@ -295,73 +321,205 @@ class BackfillJob:
 
             for ticker in tickers_df['ticker']:
                 try:
-                    # Check existing indicator data
-                    existing_dates = self._get_existing_dates(
-                        ticker, 'technical_indicators', start_date, end_date
+                    # Check existing hourly indicator data
+                    existing_hours = self._get_existing_hourly_indicators(
+                        ticker, start_date, end_date
                     )
 
-                    # Find missing date ranges
-                    missing_ranges = self._find_missing_date_ranges(
-                        existing_dates, start_date, end_date
+                    # Find missing hours
+                    missing_hours = self._find_missing_hours_for_indicators(
+                        existing_hours, ticker, start_date, end_date
                     )
 
-                    if not missing_ranges:
-                        logger.info(f"No missing indicators for {ticker}")
+                    if not missing_hours:
+                        logger.info(f"No missing hourly indicators for {ticker}")
                         stats['tickers_processed'] += 1
                         continue
 
-                    # Get OHLCV data (need extra days for indicator calculation)
+                    # Get hourly OHLCV data (need extra days for indicator calculation)
                     query = f"""
                     SELECT *
-                    FROM `{BQ_TABLES['raw_ohlcv']}`
+                    FROM `{BQ_TABLES['raw_ohlcv_hourly']}`
                     WHERE ticker = '{ticker}'
-                      AND date >= DATE_SUB('{start_date}', INTERVAL 200 DAY)
-                      AND date <= '{end_date}'
-                    ORDER BY date
+                      AND datetime >= DATETIME_SUB('{start_date} 00:00:00', INTERVAL 30 DAY)
+                      AND datetime <= DATETIME_ADD('{end_date} 23:59:59', INTERVAL 1 DAY)
+                    ORDER BY datetime
                     """
 
                     ohlcv_df = self.bq_client.query(query)
 
-                    if len(ohlcv_df) < 20:
-                        logger.warning(f"Insufficient data for {ticker}")
+                    if len(ohlcv_df) < 200:  # Need enough hourly data for indicators
+                        logger.warning(f"Insufficient hourly data for {ticker} indicators")
                         continue
 
-                    # Calculate indicators
-                    indicators_df = self.indicator_calculator.calculate_all_indicators(
+                    # Calculate hourly indicators
+                    indicators_df = self.indicator_calculator.calculate_hourly_indicators(
                         ohlcv_df,
                         ticker=ticker
                     )
 
-                    # Filter to only missing dates
+                    # Filter to only missing hours
                     indicators_df = indicators_df[
-                        indicators_df['date'].isin(
-                            self._get_dates_from_ranges(missing_ranges)
-                        )
+                        indicators_df['datetime'].isin(missing_hours)
                     ]
 
                     # Store to BigQuery
                     if not indicators_df.empty:
                         self.bq_client.insert_dataframe(
                             indicators_df,
-                            'technical_indicators',
+                            'technical_indicators_hourly',
                             if_exists='append'
                         )
                         stats['tickers_processed'] += 1
                         stats['total_records'] += len(indicators_df)
                         stats['new_records'] += len(indicators_df)
-                        logger.info(f"Stored {len(indicators_df)} new indicators for {ticker}")
+                        logger.info(f"Stored {len(indicators_df)} new hourly indicators for {ticker}")
 
                 except Exception as e:
-                    logger.error(f"Failed to process indicators for {ticker}: {e}")
+                    logger.error(f"Failed to process hourly indicators for {ticker}: {e}")
 
-            logger.info(f"Processed indicators for {stats['tickers_processed']} tickers")
+            logger.info(f"Processed hourly indicators for {stats['tickers_processed']} tickers")
 
         except Exception as e:
-            logger.error(f"Indicator backfill failed: {e}")
+            logger.error(f"Hourly indicator backfill failed: {e}")
             stats['success'] = False
             stats['error'] = str(e)
 
         return stats
+
+
+    def _get_existing_hourly_indicators(self, ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
+        """Get existing hourly indicator data."""
+        query = f"""
+        SELECT datetime
+        FROM `{BQ_TABLES['technical_indicators_hourly']}`
+        WHERE ticker = '{ticker}'
+          AND date BETWEEN '{start_date}' AND '{end_date}'
+        ORDER BY datetime
+        """
+
+        return self.bq_client.query(query)
+
+
+    def _find_missing_hours_for_indicators(
+            self,
+            existing_hours: pd.DataFrame,
+            ticker: str,
+            start_date: str,
+            end_date: str
+    ) -> List[datetime]:
+        """Find missing hours that need indicators calculated."""
+        # Get all hours that have OHLCV data
+        query = f"""
+        SELECT DISTINCT datetime
+        FROM `{BQ_TABLES['raw_ohlcv_hourly']}`
+        WHERE ticker = '{ticker}'
+          AND date BETWEEN '{start_date}' AND '{end_date}'
+        ORDER BY datetime
+        """
+
+        ohlcv_hours = self.bq_client.query(query)
+
+        if ohlcv_hours.empty:
+            return []
+
+        all_hours = pd.to_datetime(ohlcv_hours['datetime'])
+
+        if existing_hours.empty:
+            return all_hours.tolist()
+
+        existing_hours_set = set(pd.to_datetime(existing_hours['datetime']))
+        missing_hours = [h for h in all_hours if h not in existing_hours_set]
+
+        return missing_hours
+        """
+        Calculate technical indicators for hourly data.
+        
+        Note: Period parameters need adjustment for hourly vs daily:
+        - Daily SMA 20 = ~20 days = ~140-260 hourly periods
+        - Daily SMA 50 = ~50 days = ~350-650 hourly periods
+        - Daily RSI 14 = ~14 days = ~98-182 hourly periods
+        """
+
+        # Ensure data is sorted by datetime
+        df = df.sort_values('datetime').copy()
+
+        # Adjusted periods for hourly data (assuming 7 trading hours per day)
+        HOURS_PER_DAY = 7
+
+        # Simple Moving Averages - adjusted for hourly
+        df['sma_20h'] = df['close'].rolling(window=20).mean()  # 20-hour SMA
+        df['sma_140h'] = df['close'].rolling(window=140).mean()  # ~20-day equivalent
+        df['sma_350h'] = df['close'].rolling(window=350).mean()  # ~50-day equivalent
+
+        # Exponential Moving Averages
+        df['ema_12h'] = df['close'].ewm(span=12, adjust=False).mean()
+        df['ema_84h'] = df['close'].ewm(span=84, adjust=False).mean()  # ~12-day equivalent
+        df['ema_182h'] = df['close'].ewm(span=182, adjust=False).mean()  # ~26-day equivalent
+
+        # RSI - using 14-hour period and ~14-day equivalent
+        df['rsi_14h'] = self._calculate_rsi(df['close'], period=14)
+        df['rsi_98h'] = self._calculate_rsi(df['close'], period=98)
+
+        # MACD - adjusted for hourly
+        exp1 = df['close'].ewm(span=84, adjust=False).mean()   # ~12-day
+        exp2 = df['close'].ewm(span=182, adjust=False).mean()  # ~26-day
+        df['macd'] = exp1 - exp2
+        df['macd_signal'] = df['macd'].ewm(span=63, adjust=False).mean()  # ~9-day
+        df['macd_histogram'] = df['macd'] - df['macd_signal']
+
+        # Bollinger Bands - using 20-hour and ~20-day periods
+        df['bb_middle_20h'] = df['close'].rolling(window=20).mean()
+        df['bb_upper_20h'] = df['bb_middle_20h'] + 2 * df['close'].rolling(window=20).std()
+        df['bb_lower_20h'] = df['bb_middle_20h'] - 2 * df['close'].rolling(window=20).std()
+
+        # Volume-based indicators
+        df['volume_sma_20h'] = df['volume'].rolling(window=20).mean()
+        df['volume_ratio'] = df['volume'] / df['volume_sma_20h']
+
+        # Intraday-specific indicators
+        df['hour_of_day'] = pd.to_datetime(df['datetime']).dt.hour
+        df['is_market_open'] = df['hour_of_day'].between(9, 15)  # Regular trading hours
+        df['is_first_hour'] = df['hour_of_day'] == 9
+        df['is_last_hour'] = df['hour_of_day'] == 15
+
+        # High/Low of day (calculated per trading day)
+        df['high_of_day'] = df.groupby('date')['high'].transform('max')
+        df['low_of_day'] = df.groupby('date')['low'].transform('min')
+        df['pct_from_high'] = (df['close'] - df['high_of_day']) / df['high_of_day'] * 100
+        df['pct_from_low'] = (df['close'] - df['low_of_day']) / df['low_of_day'] * 100
+
+        # VWAP (Volume Weighted Average Price) - reset daily
+        df['vwap'] = (df.groupby('date')
+                      .apply(lambda x: (x['close'] * x['volume']).cumsum() / x['volume'].cumsum())
+                      .reset_index(level=0, drop=True))
+
+        # Add ticker
+        df['ticker'] = ticker
+
+        return df
+
+
+    def get_indicator_config_hourly(self):
+        """Get indicator configuration for hourly data."""
+        return {
+            'moving_averages': {
+                'sma': [20, 140, 350],  # 20-hour, ~20-day, ~50-day
+                'ema': [12, 84, 182]    # 12-hour, ~12-day, ~26-day
+            },
+            'oscillators': {
+                'rsi_periods': [14, 98],  # 14-hour, ~14-day
+                'stochastic_period': 14
+            },
+            'volatility': {
+                'atr_period': 14,
+                'bollinger_period': 20,
+                'bollinger_std': 2
+            },
+            'volume': {
+                'volume_sma': [20, 140]
+            }
+        }
 
     def _backfill_macro(self) -> bool:
         """Backfill macro economic data."""
@@ -635,6 +793,449 @@ class BackfillJob:
 
         except Exception as e:
             logger.error(f"Failed to log job results: {e}")
+
+    def _backfill_hourly_ohlcv(
+            self,
+            start_date: str,
+            end_date: str,
+            batch_size: int = 5  # Smaller batches due to more API calls needed
+    ) -> Dict:
+        """
+        Backfill hourly OHLCV data.
+
+        Note: This is much slower than daily data due to API limitations:
+        - Need to fetch month-by-month
+        - Each ticker-month combination is one API call
+        - Rate limited to 5 calls per minute
+        """
+        logger.info(f"Starting hourly OHLCV backfill from {start_date} to {end_date}")
+
+        stats = {
+            'success': True,
+            'total_tickers': 0,
+            'successful_tickers': 0,
+            'failed_tickers': [],
+            'total_records': 0,
+            'total_api_calls': 0,
+            'estimated_time_hours': 0
+        }
+
+        try:
+            # Get all tickers
+            all_tickers = self._get_all_tickers()
+            stats['total_tickers'] = len(all_tickers)
+
+            # Calculate number of months and estimate time
+            start = pd.to_datetime(start_date)
+            end = pd.to_datetime(end_date)
+            months_per_ticker = len(pd.date_range(start=start, end=end, freq='MS'))
+            total_api_calls = len(all_tickers) * months_per_ticker
+            stats['total_api_calls'] = total_api_calls
+
+            # At 5 calls/minute with 12 second delays
+            estimated_minutes = (total_api_calls * 12) / 60
+            stats['estimated_time_hours'] = round(estimated_minutes / 60, 2)
+
+            logger.info(f"Estimated time: {stats['estimated_time_hours']} hours "
+                        f"({total_api_calls} API calls at 5/minute)")
+
+            # Process each ticker
+            for idx, ticker in enumerate(all_tickers):
+                try:
+                    logger.info(f"Processing {ticker} ({idx+1}/{len(all_tickers)})")
+
+                    # Check existing data to avoid redundant fetches
+                    existing_ranges = self._get_existing_hourly_ranges(ticker, start_date, end_date)
+                    missing_months = self._find_missing_months(existing_ranges, start_date, end_date)
+
+                    if not missing_months:
+                        logger.info(f"No missing hourly data for {ticker}")
+                        stats['successful_tickers'] += 1
+                        continue
+
+                    # Fetch missing months
+                    ticker_data = []
+                    for year_month in missing_months:
+                        try:
+                            month_data = self.ohlcv_fetcher.av_client.get_hourly_ohlcv(
+                                ticker,
+                                month=year_month
+                            )
+
+                            # Filter to date range
+                            month_data = month_data[
+                                (month_data['date'] >= pd.to_datetime(start_date).date()) &
+                                (month_data['date'] <= pd.to_datetime(end_date).date())
+                                ]
+
+                            if not month_data.empty:
+                                ticker_data.append(month_data)
+                                logger.info(f"Fetched {len(month_data)} hourly records for {ticker} in {year_month}")
+
+                            # Rate limiting
+                            time.sleep(12)
+
+                        except Exception as e:
+                            logger.error(f"Failed to fetch {ticker} for {year_month}: {e}")
+
+                    # Combine and store all data for ticker
+                    if ticker_data:
+                        combined_df = pd.concat(ticker_data, ignore_index=True)
+
+                        # Store to BigQuery
+                        success = self.ohlcv_fetcher.store_hourly_to_bigquery({ticker: combined_df})
+
+                        if success.get(ticker):
+                            stats['successful_tickers'] += 1
+                            stats['total_records'] += len(combined_df)
+                        else:
+                            stats['failed_tickers'].append(ticker)
+                    else:
+                        stats['failed_tickers'].append(ticker)
+
+                except Exception as e:
+                    logger.error(f"Failed to process {ticker}: {e}")
+                    stats['failed_tickers'].append(ticker)
+
+            logger.info(f"Hourly backfill completed: {stats['successful_tickers']}/{stats['total_tickers']} tickers")
+
+        except Exception as e:
+            logger.error(f"Hourly OHLCV backfill failed: {e}")
+            stats['success'] = False
+            stats['error'] = str(e)
+
+        return stats
+
+
+    def _get_existing_hourly_ranges(self, ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
+        """Get existing hourly data date ranges for a ticker."""
+        query = f"""
+        SELECT 
+            DATE(datetime) as date,
+            COUNT(*) as hourly_records
+        FROM `{BQ_TABLES['raw_ohlcv_hourly']}`
+        WHERE ticker = '{ticker}'
+          AND date BETWEEN '{start_date}' AND '{end_date}'
+        GROUP BY date
+        ORDER BY date
+        """
+        return self.bq_client.query(query)
+
+
+    def _find_missing_months(
+            self,
+            existing_ranges: pd.DataFrame,
+            start_date: str,
+            end_date: str
+    ) -> List[str]:
+        """Find months that need to be fetched."""
+        start = pd.to_datetime(start_date)
+        end = pd.to_datetime(end_date)
+
+        # Generate all months in range
+        all_months = pd.date_range(start=start, end=end, freq='MS').strftime('%Y-%m').tolist()
+
+        if existing_ranges.empty:
+            return all_months
+
+        # Find months with incomplete data (less than expected hourly records)
+        # Assuming ~7-13 records per trading day, ~150-250 per month
+        existing_months = set()
+        for _, row in existing_ranges.iterrows():
+            if row['hourly_records'] >= 100:  # Threshold for "complete" month
+                month = pd.to_datetime(row['date']).strftime('%Y-%m')
+                existing_months.add(month)
+
+        missing_months = [m for m in all_months if m not in existing_months]
+
+        return missing_months
+
+    def _backfill_ohlcv(
+            self,
+            start_date: str,
+            end_date: str,
+            batch_size: int
+    ) -> Dict:
+        """Backfill HOURLY OHLCV data with duplicate prevention and incremental support."""
+        logger.info(f"Starting HOURLY OHLCV backfill from {start_date} to {end_date}")
+
+        stats = {
+            'success': True,
+            'total_tickers': 0,
+            'successful_tickers': 0,
+            'failed_tickers': [],
+            'total_records': 0,
+            'skipped_records': 0,
+            'new_records': 0,
+            'api_calls': 0,
+            'data_frequency': 'hourly'
+        }
+
+        try:
+            # Get all tickers
+            all_tickers = []
+            for sector, stocks in self.stocks_config.items():
+                for stock in stocks:
+                    all_tickers.append(stock['ticker'])
+
+            stats['total_tickers'] = len(all_tickers)
+
+            # Calculate expected API calls for hourly data
+            start = pd.to_datetime(start_date)
+            end = pd.to_datetime(end_date)
+            months_needed = len(pd.date_range(start=start, end=end, freq='MS'))
+            expected_api_calls = len(all_tickers) * months_needed
+
+            logger.info(f"Expected API calls: {expected_api_calls}")
+            logger.info(f"Estimated time with 75 RPM: {expected_api_calls / 75:.1f} minutes")
+
+            # Process in batches
+            for i in range(0, len(all_tickers), batch_size):
+                batch_tickers = all_tickers[i:i + batch_size]
+                logger.info(f"Processing batch {i//batch_size + 1}: {batch_tickers}")
+
+                # Process each ticker individually for better control
+                for ticker in batch_tickers:
+                    try:
+                        # Get existing hourly data date ranges
+                        existing_hours = self._get_existing_hourly_data(
+                            ticker, start_date, end_date
+                        )
+
+                        # Find missing months
+                        missing_months = self._find_missing_months_hourly(
+                            existing_hours, start_date, end_date
+                        )
+
+                        if not missing_months:
+                            logger.info(f"No missing hourly data for {ticker} in date range")
+                            stats['successful_tickers'] += 1
+                            continue
+
+                        # Fetch only missing months
+                        total_ticker_records = 0
+                        for month in missing_months:
+                            try:
+                                logger.info(f"Fetching {ticker} hourly data for {month}")
+
+                                # Fetch hourly data for this month
+                                month_data = self.ohlcv_fetcher.av_client.get_hourly_ohlcv(
+                                    ticker,
+                                    month=month
+                                )
+
+                                stats['api_calls'] += 1
+
+                                # Filter to date range
+                                if not month_data.empty:
+                                    month_data = month_data[
+                                        (month_data['date'] >= pd.to_datetime(start_date).date()) &
+                                        (month_data['date'] <= pd.to_datetime(end_date).date())
+                                        ]
+
+                                    # Additional check to prevent duplicates
+                                    month_data = self._remove_duplicate_hourly_data(
+                                        month_data, ticker
+                                    )
+
+                                    if not month_data.empty:
+                                        # Store to BigQuery
+                                        self.bq_client.insert_dataframe(
+                                            month_data,
+                                            'raw_ohlcv_hourly',
+                                            if_exists='append'
+                                        )
+                                        total_ticker_records += len(month_data)
+                                        stats['new_records'] += len(month_data)
+                                        logger.info(f"Stored {len(month_data)} hourly records for {ticker} in {month}")
+
+                            except Exception as e:
+                                logger.error(f"Failed to fetch {ticker} for {month}: {e}")
+
+                        stats['successful_tickers'] += 1
+                        stats['total_records'] += total_ticker_records
+                        logger.info(f"Completed {ticker}: {total_ticker_records} total hourly records")
+
+                    except Exception as e:
+                        logger.error(f"Failed to process {ticker}: {e}")
+                        stats['failed_tickers'].append(ticker)
+
+            stats['success'] = len(stats['failed_tickers']) < stats['total_tickers'] * 0.1
+
+            logger.info(f"HOURLY backfill completed: {stats['successful_tickers']}/{stats['total_tickers']} tickers")
+            logger.info(f"Total API calls made: {stats['api_calls']}")
+
+        except Exception as e:
+            logger.error(f"HOURLY OHLCV backfill failed: {e}")
+            stats['success'] = False
+            stats['error'] = str(e)
+
+        return stats
+
+
+    def _get_existing_hourly_data(self, ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
+        """Get existing hourly data for a ticker."""
+        query = f"""
+        SELECT 
+            DATE(datetime) as date,
+            EXTRACT(HOUR FROM datetime) as hour,
+            COUNT(*) as record_count
+        FROM `{BQ_TABLES['raw_ohlcv_hourly']}`
+        WHERE ticker = '{ticker}'
+          AND date BETWEEN '{start_date}' AND '{end_date}'
+        GROUP BY date, hour
+        ORDER BY date, hour
+        """
+
+        result = self.bq_client.query(query)
+        return result if not result.empty else pd.DataFrame()
+
+    def _find_missing_months_hourly(
+            self,
+            existing_data: pd.DataFrame,
+            start_date: str,
+            end_date: str
+    ) -> List[str]:
+        """Find months that need hourly data to be fetched."""
+        start = pd.to_datetime(start_date)
+        end = pd.to_datetime(end_date)
+
+        # Generate all months in range
+        all_months = pd.date_range(start=start, end=end, freq='MS').strftime('%Y-%m').tolist()
+
+        # Include end month if not already in list
+        end_month = end.strftime('%Y-%m')
+        if end_month not in all_months:
+            all_months.append(end_month)
+
+        if existing_data.empty:
+            return all_months
+
+        # Find months with incomplete hourly data
+        # Expected: ~7-13 hours per trading day, ~150-280 records per month
+        MIN_RECORDS_PER_MONTH = 100
+
+        existing_months = set()
+        for month_str in all_months:
+            month_data = existing_data[
+                existing_data['date'].astype(str).str.startswith(month_str)
+            ]
+
+            if len(month_data) >= MIN_RECORDS_PER_MONTH:
+                existing_months.add(month_str)
+
+        missing_months = [m for m in all_months if m not in existing_months]
+
+        return missing_months
+
+
+    def _remove_duplicate_hourly_data(self, df: pd.DataFrame, ticker: str) -> pd.DataFrame:
+        """Remove duplicate hourly records that already exist in BigQuery."""
+        if df.empty:
+            return df
+
+        min_datetime = df['datetime'].min()
+        max_datetime = df['datetime'].max()
+
+        # Query existing datetimes
+        query = f"""
+        SELECT DISTINCT datetime
+        FROM `{BQ_TABLES['raw_ohlcv_hourly']}`
+        WHERE ticker = '{ticker}'
+          AND datetime BETWEEN '{min_datetime}' AND '{max_datetime}'
+        """
+
+        existing_df = self.bq_client.query(query)
+
+        if not existing_df.empty:
+            existing_datetimes = pd.to_datetime(existing_df['datetime'])
+            initial_count = len(df)
+            df = df[~df['datetime'].isin(existing_datetimes)]
+            removed_count = initial_count - len(df)
+
+            if removed_count > 0:
+                logger.info(f"Filtered out {removed_count} duplicate hourly records for {ticker}")
+
+        return df
+
+
+    def _get_existing_dates(self, ticker: str, table: str, start_date: str, end_date: str) -> pd.DataFrame:
+        """Get existing dates for a ticker in a table."""
+        # For hourly data, we need to check by datetime, not just date
+        if table == 'technical_indicators_hourly':
+            query = f"""
+            SELECT DISTINCT datetime
+            FROM `{BQ_TABLES[table]}`
+            WHERE ticker = '{ticker}'
+              AND date BETWEEN '{start_date}' AND '{end_date}'
+            ORDER BY datetime
+            """
+        else:
+            query = f"""
+            SELECT DISTINCT date
+            FROM `{BQ_TABLES[table]}`
+            WHERE ticker = '{ticker}'
+              AND date BETWEEN '{start_date}' AND '{end_date}'
+            ORDER BY date
+            """
+
+        result = self.bq_client.query(query)
+        return result if not result.empty else pd.DataFrame()
+
+
+    def _find_missing_date_ranges(
+            self,
+            existing_dates: pd.DataFrame,
+            start_date: str,
+            end_date: str
+    ) -> List[Tuple[str, str]]:
+        """Find continuous ranges of missing dates."""
+        if existing_dates.empty:
+            return [(start_date, end_date)]
+
+        # For hourly data, we need different logic
+        if 'datetime' in existing_dates.columns:
+            # Group by date and check if we have enough hours
+            dates_with_hours = existing_dates.groupby(pd.to_datetime(existing_dates['datetime']).dt.date).size()
+            dates_with_sufficient_hours = dates_with_hours[dates_with_hours >= 7].index  # At least 7 hours
+            existing_date_list = pd.to_datetime(dates_with_sufficient_hours)
+        else:
+            existing_date_list = pd.to_datetime(existing_dates['date'])
+
+        # Generate all business days in range
+        all_dates = pd.date_range(start_date, end_date, freq='B')
+
+        # Find missing dates
+        missing_dates = all_dates.difference(existing_date_list)
+
+        if missing_dates.empty:
+            return []
+
+        # Group consecutive missing dates into ranges
+        missing_ranges = []
+        current_start = missing_dates[0]
+        current_end = missing_dates[0]
+
+        for i in range(1, len(missing_dates)):
+            if (missing_dates[i] - current_end).days <= 1:
+                current_end = missing_dates[i]
+            else:
+                missing_ranges.append((
+                    current_start.strftime('%Y-%m-%d'),
+                    current_end.strftime('%Y-%m-%d')
+                ))
+                current_start = missing_dates[i]
+                current_end = missing_dates[i]
+
+        # Add the last range
+        missing_ranges.append((
+            current_start.strftime('%Y-%m-%d'),
+            current_end.strftime('%Y-%m-%d')
+        ))
+
+        return missing_ranges
+
+
 
 
 @click.command()

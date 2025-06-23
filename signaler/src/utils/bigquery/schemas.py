@@ -1,5 +1,5 @@
 """
-BigQuery table schema definitions.
+BigQuery table schema definitions - Updated for HOURLY data.
 """
 from typing import Dict, List
 from google.cloud import bigquery
@@ -8,8 +8,15 @@ from google.cloud import bigquery
 def get_table_schemas() -> Dict[str, List[bigquery.SchemaField]]:
     """Get all table schemas for the trading signal system."""
     return {
+        # Daily tables (kept for backward compatibility)
         'raw_ohlcv': _get_ohlcv_schema(),
         'technical_indicators': _get_technical_indicators_schema(),
+
+        # NEW HOURLY TABLES
+        'raw_ohlcv_hourly': _get_ohlcv_hourly_schema(),
+        'technical_indicators_hourly': _get_technical_indicators_hourly_schema(),
+
+        # Other tables remain unchanged
         'macro_indicators': _get_macro_indicators_schema(),
         'sentiment_data': _get_sentiment_data_schema(),
         'temporal_features': _get_temporal_features_schema(),
@@ -21,7 +28,7 @@ def get_table_schemas() -> Dict[str, List[bigquery.SchemaField]]:
 
 
 def _get_ohlcv_schema() -> List[bigquery.SchemaField]:
-    """Schema for raw OHLCV data."""
+    """Schema for raw OHLCV DAILY data (legacy)."""
     return [
         bigquery.SchemaField("ticker", "STRING", mode="REQUIRED"),
         bigquery.SchemaField("date", "DATE", mode="REQUIRED"),
@@ -35,8 +42,25 @@ def _get_ohlcv_schema() -> List[bigquery.SchemaField]:
     ]
 
 
+def _get_ohlcv_hourly_schema() -> List[bigquery.SchemaField]:
+    """Schema for raw OHLCV HOURLY data."""
+    return [
+        bigquery.SchemaField("ticker", "STRING", mode="REQUIRED"),
+        bigquery.SchemaField("datetime", "DATETIME", mode="REQUIRED"),
+        bigquery.SchemaField("date", "DATE", mode="REQUIRED"),
+        bigquery.SchemaField("hour", "INTEGER", mode="REQUIRED"),
+        bigquery.SchemaField("open", "FLOAT64", mode="REQUIRED"),
+        bigquery.SchemaField("high", "FLOAT64", mode="REQUIRED"),
+        bigquery.SchemaField("low", "FLOAT64", mode="REQUIRED"),
+        bigquery.SchemaField("close", "FLOAT64", mode="REQUIRED"),
+        bigquery.SchemaField("volume", "INTEGER", mode="REQUIRED"),
+        bigquery.SchemaField("adjusted_close", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("inserted_at", "TIMESTAMP", mode="REQUIRED"),
+    ]
+
+
 def _get_technical_indicators_schema() -> List[bigquery.SchemaField]:
-    """Schema for technical indicators."""
+    """Schema for technical indicators DAILY (legacy)."""
     return [
         bigquery.SchemaField("ticker", "STRING", mode="REQUIRED"),
         bigquery.SchemaField("date", "DATE", mode="REQUIRED"),
@@ -61,31 +85,63 @@ def _get_technical_indicators_schema() -> List[bigquery.SchemaField]:
     ]
 
 
-def _get_macro_indicators_schema() -> List[bigquery.SchemaField]:
-    """Schema for macro economic indicators."""
-    fields = [
+def _get_technical_indicators_hourly_schema() -> List[bigquery.SchemaField]:
+    """Schema for technical indicators HOURLY."""
+    return [
+        bigquery.SchemaField("ticker", "STRING", mode="REQUIRED"),
+        bigquery.SchemaField("datetime", "DATETIME", mode="REQUIRED"),
         bigquery.SchemaField("date", "DATE", mode="REQUIRED"),
-        bigquery.SchemaField("gdp", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("gdp_growth", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("cpi", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("cpi_yoy", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("pce", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("nfp", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("unemployment_rate", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("fed_funds_rate", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("yield_curve_spread", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("retail_sales", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("ism_manufacturing", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("ism_services", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("consumer_confidence", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("wti_crude", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("brent_crude", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("china_pmi", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("china_gdp", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("m2_money_supply", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("hour", "INTEGER", mode="REQUIRED"),
+
+        # Short-term hourly indicators
+        bigquery.SchemaField("sma_20h", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("sma_140h", "FLOAT64", mode="NULLABLE"),  # ~20 day equivalent
+        bigquery.SchemaField("sma_350h", "FLOAT64", mode="NULLABLE"),  # ~50 day equivalent
+        bigquery.SchemaField("ema_12h", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("ema_84h", "FLOAT64", mode="NULLABLE"),   # ~12 day equivalent
+        bigquery.SchemaField("ema_182h", "FLOAT64", mode="NULLABLE"),  # ~26 day equivalent
+        bigquery.SchemaField("rsi_14h", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("rsi_98h", "FLOAT64", mode="NULLABLE"),   # ~14 day equivalent
+
+        # MACD
+        bigquery.SchemaField("macd", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("macd_signal", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("macd_histogram", "FLOAT64", mode="NULLABLE"),
+
+        # Bollinger Bands
+        bigquery.SchemaField("bb_upper_20h", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("bb_middle_20h", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("bb_lower_20h", "FLOAT64", mode="NULLABLE"),
+
+        # Volume indicators
+        bigquery.SchemaField("volume_sma_20h", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("volume_ratio", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("obv", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("vwap", "FLOAT64", mode="NULLABLE"),
+
+        # Hourly-specific indicators
+        bigquery.SchemaField("hour_of_day", "INTEGER", mode="NULLABLE"),
+        bigquery.SchemaField("is_market_open", "BOOLEAN", mode="NULLABLE"),
+        bigquery.SchemaField("is_first_hour", "BOOLEAN", mode="NULLABLE"),
+        bigquery.SchemaField("is_last_hour", "BOOLEAN", mode="NULLABLE"),
+        bigquery.SchemaField("high_of_day", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("low_of_day", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("pct_from_high", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("pct_from_low", "FLOAT64", mode="NULLABLE"),
+
         bigquery.SchemaField("inserted_at", "TIMESTAMP", mode="REQUIRED"),
     ]
-    return fields
+
+
+def _get_macro_indicators_schema() -> List[bigquery.SchemaField]:
+    """Schema for macro economic indicators."""
+    return [
+        bigquery.SchemaField("date", "DATE", mode="REQUIRED"),
+        bigquery.SchemaField("indicator", "STRING", mode="REQUIRED"),
+        bigquery.SchemaField("value", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("yoy_change", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("inserted_at", "TIMESTAMP", mode="REQUIRED"),
+    ]
 
 
 def _get_sentiment_data_schema() -> List[bigquery.SchemaField]:
@@ -94,9 +150,10 @@ def _get_sentiment_data_schema() -> List[bigquery.SchemaField]:
         bigquery.SchemaField("ticker", "STRING", mode="REQUIRED"),
         bigquery.SchemaField("date", "DATE", mode="REQUIRED"),
         bigquery.SchemaField("sector", "STRING", mode="NULLABLE"),
-        bigquery.SchemaField("sentiment_score", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("volume_mentions", "INT64", mode="NULLABLE"),
-        bigquery.SchemaField("source", "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("news_sentiment", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("social_sentiment", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("analyst_rating", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("composite_sentiment", "FLOAT64", mode="NULLABLE"),
         bigquery.SchemaField("inserted_at", "TIMESTAMP", mode="REQUIRED"),
     ]
 
@@ -105,17 +162,11 @@ def _get_temporal_features_schema() -> List[bigquery.SchemaField]:
     """Schema for temporal features."""
     return [
         bigquery.SchemaField("date", "DATE", mode="REQUIRED"),
-        bigquery.SchemaField("day_of_week", "INT64", mode="REQUIRED"),
-        bigquery.SchemaField("month", "INT64", mode="REQUIRED"),
-        bigquery.SchemaField("quarter", "INT64", mode="REQUIRED"),
-        bigquery.SchemaField("year", "INT64", mode="REQUIRED"),
-        bigquery.SchemaField("is_holiday", "BOOL", mode="REQUIRED"),
-        bigquery.SchemaField("days_to_next_holiday", "INT64", mode="NULLABLE"),
-        bigquery.SchemaField("is_earnings_season", "BOOL", mode="REQUIRED"),
-        bigquery.SchemaField("is_month_start", "BOOL", mode="REQUIRED"),
-        bigquery.SchemaField("is_month_end", "BOOL", mode="REQUIRED"),
-        bigquery.SchemaField("is_quarter_start", "BOOL", mode="REQUIRED"),
-        bigquery.SchemaField("is_quarter_end", "BOOL", mode="REQUIRED"),
+        bigquery.SchemaField("is_holiday", "BOOL", mode="NULLABLE"),
+        bigquery.SchemaField("is_earnings_season", "BOOL", mode="NULLABLE"),
+        bigquery.SchemaField("is_fomc_week", "BOOL", mode="NULLABLE"),
+        bigquery.SchemaField("days_to_quarter_end", "INT64", mode="NULLABLE"),
+        bigquery.SchemaField("market_regime", "STRING", mode="NULLABLE"),
         bigquery.SchemaField("inserted_at", "TIMESTAMP", mode="REQUIRED"),
     ]
 
@@ -125,29 +176,25 @@ def _get_stock_metadata_schema() -> List[bigquery.SchemaField]:
     return [
         bigquery.SchemaField("ticker", "STRING", mode="REQUIRED"),
         bigquery.SchemaField("name", "STRING", mode="REQUIRED"),
-        bigquery.SchemaField("sector", "STRING", mode="REQUIRED"),
+        bigquery.SchemaField("sector", "STRING", mode="NULLABLE"),
         bigquery.SchemaField("industry", "STRING", mode="NULLABLE"),
-        bigquery.SchemaField("market_cap_category", "STRING", mode="REQUIRED"),
+        bigquery.SchemaField("market_cap_category", "STRING", mode="NULLABLE"),
         bigquery.SchemaField("exchange", "STRING", mode="NULLABLE"),
         bigquery.SchemaField("updated_at", "TIMESTAMP", mode="REQUIRED"),
     ]
 
 
 def _get_predictions_schema() -> List[bigquery.SchemaField]:
-    """Schema for predictions."""
+    """Schema for model predictions."""
     return [
-        bigquery.SchemaField("prediction_id", "STRING", mode="REQUIRED"),
-        bigquery.SchemaField("model_version", "STRING", mode="REQUIRED"),
         bigquery.SchemaField("ticker", "STRING", mode="REQUIRED"),
         bigquery.SchemaField("prediction_date", "DATE", mode="REQUIRED"),
-        bigquery.SchemaField("horizon_1d", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("horizon_7d", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("horizon_30d", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("horizon_60d", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("confidence_1d", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("confidence_7d", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("confidence_30d", "FLOAT64", mode="NULLABLE"),
-        bigquery.SchemaField("confidence_60d", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("model_version", "STRING", mode="REQUIRED"),
+        bigquery.SchemaField("horizon_days", "INT64", mode="REQUIRED"),
+        bigquery.SchemaField("predicted_return", "FLOAT64", mode="REQUIRED"),
+        bigquery.SchemaField("confidence_score", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("predicted_direction", "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("feature_importance", "JSON", mode="NULLABLE"),
         bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED"),
     ]
 
@@ -186,7 +233,9 @@ def get_partitioning_config(table_name: str) -> Dict[str, str]:
     """Get partitioning configuration for a table."""
     partitioned_tables = {
         'raw_ohlcv': 'date',
+        'raw_ohlcv_hourly': 'date',  # Partition hourly data by date
         'technical_indicators': 'date',
+        'technical_indicators_hourly': 'date',  # Partition hourly indicators by date
         'sentiment_data': 'date',
         'predictions': 'prediction_date',
         'temporal_features': 'date',
@@ -205,7 +254,9 @@ def get_clustering_fields(table_name: str) -> List[str]:
     """Get clustering fields for a table."""
     clustering_config = {
         'raw_ohlcv': ['ticker'],
+        'raw_ohlcv_hourly': ['ticker', 'hour'],  # Cluster by ticker and hour
         'technical_indicators': ['ticker'],
+        'technical_indicators_hourly': ['ticker', 'hour'],  # Cluster by ticker and hour
         'sentiment_data': ['ticker', 'sector'],
         'predictions': ['ticker', 'model_version'],
     }
