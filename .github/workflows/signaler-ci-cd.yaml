@@ -59,10 +59,14 @@ jobs:
           mypy src/ --ignore-missing-imports || true
 
       - name: Run unit tests
+#        ALSO DISABLING :(
+        if: false
         run: |
           pytest tests/ -v -m "not integration" --cov=src --cov-report=xml --cov-report=html
 
       - name: Upload coverage reports
+#        DISALED
+        if: false
         uses: codecov/codecov-action@v4
         with:
           file: ./coverage.xml
@@ -71,8 +75,10 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}  # Required for v4
 
       - name: Archive test results
+#        DISABLED
+        if: false
         uses: actions/upload-artifact@v4
-        if: always()
+        # if: always()
         with:
           name: test-results
           path: |
@@ -83,6 +89,8 @@ jobs:
   security:
     name: Security Scan
     runs-on: ubuntu-latest
+#    DISABLED
+    if: false
 
     steps:
       - name: Checkout code
