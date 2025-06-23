@@ -85,7 +85,12 @@ class MacroDataFetcher:
         value_cols = [col for col in df.columns if col not in ['date', 'indicator']]
         if value_cols:
             df['value'] = df[value_cols[0]]
+            # Add the indicator column before selecting it
+            df['indicator'] = indicator
             df = df[['date', 'value', 'indicator']]
+        else:
+            logger.error(f"No value column found for {indicator}")
+            return pd.DataFrame()
 
         # Sort by date
         df = df.sort_values('date')
