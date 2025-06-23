@@ -321,7 +321,9 @@ jobs:
           python scripts/data_quality_check.py || echo "Script not found, skipping..."
 
       - name: Alert on issues
-        if: failure()
+        # if: failure()
+        # DISABLED
+        if: false
         uses: 8398a7/action-slack@v3
         with:
           status: 'failure'
