@@ -169,7 +169,9 @@ module "cloud_run" {
   services = {
     daily_ingestion = {
       name   = "daily-ingestion"
-      image  = "gcr.io/${var.project_id}/trading-system/daily-ingestion:latest"
+      # Use Google's hello world image as placeholder
+      # CI/CD will update this, and Terraform will ignore changes
+      image  = "us-docker.pkg.dev/cloudrun/container/hello"
       cpu    = "2"
       memory = "4Gi"
       env_vars = {
@@ -180,7 +182,9 @@ module "cloud_run" {
 
     prediction_service = {
       name   = "prediction-service"
-      image  = "gcr.io/${var.project_id}/trading-system/prediction-service:latest"
+      # Use Google's hello world image as placeholder
+      # CI/CD will update this, and Terraform will ignore changes
+      image  = "us-docker.pkg.dev/cloudrun/container/hello"
       cpu    = "4"
       memory = "8Gi"
       env_vars = {

@@ -1,4 +1,5 @@
 # Cloud Run module for Trading Signal System
+# This version uses placeholder images initially but ignores changes after creation
 
 # Cloud Run services
 resource "google_cloud_run_service" "services" {
@@ -67,6 +68,9 @@ resource "google_cloud_run_service" "services" {
 
   lifecycle {
     ignore_changes = [
+      # Ignore image changes after initial creation
+      template[0].spec[0].containers[0].image,
+      # Also ignore these annotations that change frequently
       template[0].metadata[0].annotations["run.googleapis.com/client-name"],
       template[0].metadata[0].annotations["run.googleapis.com/client-version"],
     ]
