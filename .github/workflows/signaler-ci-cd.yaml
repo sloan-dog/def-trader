@@ -132,6 +132,11 @@ jobs:
     if: github.event_name == 'push'
 
     steps:
+      - name: Debug - List directory contents
+        run: |
+          pwd
+          ls -la
+          ls -la docker/ || echo "docker directory not found"
       - name: Checkout code
         uses: actions/checkout@v4
 
