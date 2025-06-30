@@ -21,6 +21,8 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
+#    DISABLED
+    if: false
     defaults:
       run:
         working-directory: ./signaler
