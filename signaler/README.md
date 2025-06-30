@@ -434,4 +434,4 @@ The expensive resources (Cloud Run, Vertex AI) are created later when needed.
 
 ## Disclaimer
 
-This system is for educational and research purposes only. Always perform your own due diligence before making investment decisions. Past performance does not guarantee future results.
+This system is for educational and research purposes only. Always perform your own due diligence before making investment decisions. Past performance does not guarantee future results.modi
