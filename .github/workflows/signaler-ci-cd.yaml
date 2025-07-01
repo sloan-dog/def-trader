@@ -267,7 +267,7 @@ jobs:
       - name: Deploy Infrastructure
         run: |
           cd terraform
-          tofu init
+          tofu init -backend-config=backend.conf
           tofu plan -var="project_id=${{ env.GCP_PROJECT_ID }}"
           # Uncomment to auto-apply
           # tofu apply -auto-approve -var="project_id=${{ env.GCP_PROJECT_ID }}"
