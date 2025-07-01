@@ -296,7 +296,8 @@ jobs:
           echo "Cloud Scheduler jobs updated"
 
       - name: Send deployment notification
-        if: always()
+#        DISABLED
+        if: false
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
