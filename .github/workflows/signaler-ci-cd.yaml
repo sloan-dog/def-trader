@@ -259,19 +259,6 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Install OpenTofu
-        uses: opentofu/setup-opentofu@v1
-        with:
-          tofu_version: 1.6.2
-
-      - name: Deploy Infrastructure
-        run: |
-          cd terraform
-          tofu init -backend-config=backend.conf
-          tofu plan -var="project_id=${{ env.GCP_PROJECT_ID }}"
-          # Uncomment to auto-apply
-          # tofu apply -auto-approve -var="project_id=${{ env.GCP_PROJECT_ID }}"
-
       - name: Deploy to Cloud Run (Production)
         run: |
           # Deploy daily ingestion service
