@@ -29,8 +29,8 @@ BQ_TABLE_EXPIRATION_DAYS = 365  # For temporary tables
 # BigQuery table names - Updated for hourly data
 BQ_TABLES = {
     # Legacy daily tables (kept for compatibility)
-    "raw_ohlcv": f"{BQ_DATASET}.raw_ohlcv_daily",
-    "technical_indicators": f"{BQ_DATASET}.technical_indicators_daily",
+    "raw_ohlcv": f"{BQ_DATASET}.raw_ohlcv",
+    "technical_indicators": f"{BQ_DATASET}.technical_indicators",
 
     # New hourly tables
     "raw_ohlcv_hourly": f"{BQ_DATASET}.raw_ohlcv_hourly",
