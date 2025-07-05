@@ -1,0 +1,33 @@
+# Optimized Dockerfile for training service using shared base
+
+ARG BASE_IMAGE=trading-signal-base:latest
+FROM ${BASE_IMAGE} as base
+
+# Switch to root to install additional dependencies
+USER root
+
+# Install system dependencies needed for torch
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install training-specific dependencies (including heavy ML libraries)
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -e .[training,feature-engineering]
+
+# Create MLflow directory
+RUN mkdir -p /app/mlruns && chown -R appuser:appuser /app/mlruns
+
+# Switch back to non-root user
+USER appuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import torch; import torch_geometric; print('OK')" || exit 1
+
+# Port for MLflow UI if needed
+EXPOSE 5000
+
+# Default command - run training job
+CMD ["trading-train"]

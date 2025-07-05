@@ -1,43 +1,16 @@
-# Dockerfile for data ingestion service
+# Optimized Dockerfile for data ingestion service using shared base
 
-ARG PYTHON_VERSION=3.11.6
-FROM python:${PYTHON_VERSION}-slim
+ARG BASE_IMAGE=trading-signal-base:latest
+FROM ${BASE_IMAGE} as base
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Switch to root to install additional dependencies
+USER root
 
-# Set working directory
-WORKDIR /app
-
-# Copy pyproject.toml first for better caching
-COPY pyproject.toml ./
-
-# Upgrade pip and install build tools
+# Install ingestion-specific dependencies
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade pip setuptools wheel
+    pip install -e .[ingestion,feature-engineering]
 
-# Install the package in production mode (minimal dependencies)
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install .
-
-# Copy source code
-COPY src/ ./src/
-COPY config/ ./config/
-
-# Create necessary directories
-RUN mkdir -p /app/logs
-
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app:$PYTHONPATH
-
-# Create non-root user
-RUN useradd -m -u 1000 appuser && \
-    chown -R appuser:appuser /app
+# Switch back to non-root user
 USER appuser
 
 # Health check

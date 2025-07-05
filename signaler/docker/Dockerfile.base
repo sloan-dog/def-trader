@@ -1,14 +1,11 @@
-# Base Dockerfile for Trading Signal System
+# Optimized Base Dockerfile for Trading Signal System
+# This base image contains only core dependencies shared by all services
 
 ARG PYTHON_VERSION=3.11.6
-FROM python:${PYTHON_VERSION}-slim
+FROM python:${PYTHON_VERSION}-slim as base
 
-# Install system dependencies
+# Install minimal system dependencies
 RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    git \
-    wget \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -22,9 +19,9 @@ COPY pyproject.toml ./
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip setuptools wheel
 
-# Install the package with minimal dependencies
+# Install ONLY core dependencies (shared by all services)
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install .
+    pip install -e .
 
 # Copy source code
 COPY src/ ./src/
@@ -44,4 +41,6 @@ USER appuser
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import src.utils.bigquery_client; print('OK')" || exit 1
+    CMD python -c "import pandas; print('OK')" || exit 1
+
+# This is a base image - no CMD specified

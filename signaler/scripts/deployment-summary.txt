@@ -1,0 +1,27 @@
+Trading Signal System Deployment Summary
+======================================
+Date: Mon Jun 23 13:46:40 PDT 2025
+Project: trading-signals-420-69
+Region: us-central1
+Environment: prod
+
+Resources Created:
+      40 total resources
+
+Key Components:
+- BigQuery Dataset: trading_signals
+- Cloud Run Services: daily-ingestion, prediction-api
+- Cloud Scheduler Jobs: daily-data-ingestion
+- Service Account: trading-system@trading-signals-420-69.iam.gserviceaccount.com
+
+URLs:
+- Ingestion Service: [0;34mUsing OpenTofu[0m
+[0;32mRunning: tofu output -raw daily_ingestion_url -var-file=terraform.tfvars[0m
+- Prediction API: [0;34mUsing OpenTofu[0m
+[0;32mRunning: tofu output -raw prediction_api_url -var-file=terraform.tfvars[0m
+
+Next Steps:
+1. Configure Alpha Vantage API key in Secret Manager
+2. Run initial data backfill
+3. Train first model
+4. Enable monitoring

@@ -39,8 +39,10 @@ jobs:
       - name: Cache dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('pyproject.toml') }}
+          path: |
+            ~/.cache/pip
+            ~/.cache/pypoetry
+          key: ${{ runner.os }}-pip-${{ hashFiles('signaler/pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
@@ -165,10 +167,15 @@ jobs:
           tags: |
             gcr.io/${{ env.GCP_PROJECT_ID }}/trading-system/base:latest
             gcr.io/${{ env.GCP_PROJECT_ID }}/trading-system/base:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha
+            type=registry,ref=gcr.io/${{ env.GCP_PROJECT_ID }}/trading-system/base:buildcache
+          cache-to: |
+            type=gha,mode=max
+            type=registry,ref=gcr.io/${{ env.GCP_PROJECT_ID }}/trading-system/base:buildcache,mode=max
           build-args: |
             PYTHON_VERSION=${{ env.PYTHON_VERSION }}
+            BUILDKIT_INLINE_CACHE=1
 
       - name: Build and push ingestion image
         uses: docker/build-push-action@v5
@@ -179,10 +186,15 @@ jobs:
           tags: |
             gcr.io/${{ env.GCP_PROJECT_ID }}/trading-system/daily-ingestion:latest
             gcr.io/${{ env.GCP_PROJECT_ID }}/trading-system/daily-ingestion:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha
+            type=registry,ref=gcr.io/${{ env.GCP_PROJECT_ID }}/trading-system/daily-ingestion:buildcache
+          cache-to: |
+            type=gha,mode=max
+            type=registry,ref=gcr.io/${{ env.GCP_PROJECT_ID }}/trading-system/daily-ingestion:buildcache,mode=max
           build-args: |
-            PYTHON_VERSION=${{ env.PYTHON_VERSION }}
+            BASE_IMAGE=gcr.io/${{ env.GCP_PROJECT_ID }}/trading-system/base:${{ github.sha }}
+            BUILDKIT_INLINE_CACHE=1
 
       - name: Build and push API image
         uses: docker/build-push-action@v5
@@ -193,10 +205,15 @@ jobs:
           tags: |
             gcr.io/${{ env.GCP_PROJECT_ID }}/trading-system/api:latest
             gcr.io/${{ env.GCP_PROJECT_ID }}/trading-system/api:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha
+            type=registry,ref=gcr.io/${{ env.GCP_PROJECT_ID }}/trading-system/api:buildcache
+          cache-to: |
+            type=gha,mode=max
+            type=registry,ref=gcr.io/${{ env.GCP_PROJECT_ID }}/trading-system/api:buildcache,mode=max
           build-args: |
-            PYTHON_VERSION=${{ env.PYTHON_VERSION }}
+            BASE_IMAGE=gcr.io/${{ env.GCP_PROJECT_ID }}/trading-system/base:${{ github.sha }}
+            BUILDKIT_INLINE_CACHE=1
 
   # Deploy to staging
   deploy-staging:
