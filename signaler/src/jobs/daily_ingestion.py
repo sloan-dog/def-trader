@@ -4,6 +4,7 @@ Daily data ingestion job for all data sources.
 import click
 import sys
 from datetime import datetime, timedelta
+from typing import Dict
 from loguru import logger
 import traceback
 
