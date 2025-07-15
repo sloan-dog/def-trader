@@ -8,6 +8,7 @@ from loguru import logger
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from src.utils.logging_config import setup_logging, log_exception
 from config.settings import (
     load_stocks_config,
     INGESTION_CONFIG,
@@ -82,7 +83,7 @@ class OHLCVFetcher:
                         failed_tickers.append(ticker)
 
                 except Exception as e:
-                    logger.error(f"Failed to fetch {ticker}: {e}")
+                    log_exception(f"Failed to fetch {ticker}", exception=e)
                     failed_tickers.append(ticker)
 
         if failed_tickers:
@@ -145,8 +146,7 @@ class OHLCVFetcher:
                     logger.warning(f"No data returned for {ticker} during daily update")
 
             except Exception as e:
-                logger.error(f"Failed to fetch daily update for {ticker}: {e}")
-                logger.debug(f"Daily update exception for {ticker}: {type(e).__name__}: {str(e)}")
+                log_exception(f"Failed to fetch daily update for {ticker}", exception=e, ticker=ticker)
 
         logger.info(f"Completed daily updates. Successfully fetched data for {len(results)} out of {len(tickers)} tickers")
         return results
@@ -226,7 +226,7 @@ class OHLCVFetcher:
                     logger.info(f"No new data to store for {ticker}")
 
             except Exception as e:
-                logger.error(f"Failed to store data for {ticker}: {e}")
+                log_exception(f"Failed to store data for {ticker}", exception=e, ticker=ticker)
                 results[ticker] = False
 
         return results
@@ -250,8 +250,7 @@ class OHLCVFetcher:
                 
             return data
         except Exception as e:
-            logger.error(f"Error fetching {ticker}: {e}")
-            logger.debug(f"Full exception details for {ticker}: {type(e).__name__}: {str(e)}")
+            log_exception(f"Error fetching {ticker}", exception=e, ticker=ticker)
             return None
 
     def _get_all_tickers(self) -> List[str]:
@@ -345,7 +344,7 @@ class OHLCVFetcher:
                                 results[ticker] = len(missing_data)
 
             except Exception as e:
-                logger.error(f"Failed to backfill {ticker}: {e}")
+                log_exception(f"Failed to backfill {ticker}", exception=e, ticker=ticker)
                 results[ticker] = 0
 
         return results
@@ -377,7 +376,7 @@ class OHLCVFetcher:
                     reports.append(result.iloc[0].to_dict())
 
             except Exception as e:
-                logger.error(f"Failed to get quality report for {ticker}: {e}")
+                log_exception(f"Failed to get quality report for {ticker}", exception=e, ticker=ticker)
 
         if reports:
             return pd.DataFrame(reports)

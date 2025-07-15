@@ -153,7 +153,7 @@ class BigQueryOperations(BigQueryBase):
 
         try:
             result = self.query(query)
-            if not result.empty and result['latest_date'].iloc[0]:
+            if not result.empty and result['latest_date'].iloc[0] is not None:
                 return pd.Timestamp(result['latest_date'].iloc[0])
         except Exception as e:
             logger.warning(f"Could not get latest date: {e}")

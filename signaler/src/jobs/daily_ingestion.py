@@ -8,6 +8,7 @@ from typing import Dict
 from loguru import logger
 import traceback
 
+from src.utils.logging_config import setup_logging, log_exception
 from src.data_ingestion.ohlcv_fetcher import OHLCVUpdater
 from src.data_ingestion.macro_data_fetcher import MacroDataUpdater
 from src.data_ingestion.alpha_vantage_client import AlphaVantageClient
@@ -23,19 +24,25 @@ class DailyIngestionJob:
 
     def __init__(self):
         """Initialize job components."""
+        self.is_cloud_run = self._is_cloud_run()
         self.ohlcv_updater = OHLCVUpdater()
         self.macro_updater = MacroDataUpdater()
         self.indicator_calculator = TechnicalIndicatorCalculator()
         self.temporal_engineer = TemporalFeatureEngineer()
         self.bq_client = BigQueryClient()
         self.stocks_config = load_stocks_config()
+    
+    def _is_cloud_run(self) -> bool:
+        """Check if running in Google Cloud Run."""
+        import os
+        return bool(os.environ.get("K_SERVICE") or os.environ.get("GOOGLE_CLOUD_PROJECT"))
 
-        # Configure logging
-        logger.add(
-            "logs/daily_ingestion_{time}.log",
+        # Configure logging with JSON format for Google Cloud
+        setup_logging(
+            level="INFO",
+            log_file="logs/daily_ingestion_{time}.log" if not self._is_cloud_run() else None,
             rotation="1 day",
-            retention="30 days",
-            level="INFO"
+            retention="30 days"
         )
 
     def run(self, date: str = None):
@@ -95,10 +102,10 @@ class DailyIngestionJob:
             )
 
         except Exception as e:
-            logger.error(f"Daily ingestion failed: {e}")
-            logger.error(traceback.format_exc())
+            log_exception("Daily ingestion failed", exception=e)
             results['overall_success'] = False
             results['error'] = str(e)
+            results['traceback'] = traceback.format_exc()
 
         finally:
             results['end_time'] = datetime.now()
@@ -115,7 +122,7 @@ class DailyIngestionJob:
             self.ohlcv_updater.run_daily_update()
             return True
         except Exception as e:
-            logger.error(f"OHLCV update failed: {e}")
+            log_exception("OHLCV update failed", exception=e)
             return False
 
     def _calculate_indicators(self, date: str) -> bool:
@@ -177,13 +184,13 @@ class DailyIngestionJob:
                     success_count += 1
 
                 except Exception as e:
-                    logger.error(f"Failed to calculate indicators for {ticker}: {e}")
+                    log_exception(f"Failed to calculate indicators for {ticker}", exception=e, ticker=ticker)
 
             logger.info(f"Calculated indicators for {success_count}/{len(updated_tickers)} tickers")
             return success_count > 0
 
         except Exception as e:
-            logger.error(f"Indicator calculation failed: {e}")
+            log_exception("Indicator calculation failed", exception=e)
             return False
 
     def _update_macro_data(self) -> bool:
@@ -371,7 +378,7 @@ def main(date):
         logger.info("Daily ingestion completed successfully")
         sys.exit(0)
     else:
-        logger.error("Daily ingestion failed")
+        logger.error("Daily ingestion failed - see logs for details")
         sys.exit(1)
 
 

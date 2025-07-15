@@ -8,6 +8,7 @@ from loguru import logger
 import mlflow
 import json
 
+from src.utils.logging_config import setup_logging, log_exception
 from src.training.trainer import GNNTrainer
 from src.training.prediction_pipeline import PredictionPipeline
 from src.training.metrics import ModelMetrics
@@ -20,17 +21,23 @@ class TrainingJob:
 
     def __init__(self, experiment_name: str = "temporal_gnn_trading"):
         """Initialize training job."""
+        self.is_cloud_run = self._is_cloud_run()
         self.trainer = GNNTrainer(experiment_name=experiment_name)
         self.bq_client = BigQueryClient()
         self.metrics_calculator = ModelMetrics()
 
-        # Configure logging
-        logger.add(
-            "logs/training_{time}.log",
+        # Configure logging with JSON format for Google Cloud
+        setup_logging(
+            level="INFO",
+            log_file="logs/training_{time}.log" if not self.is_cloud_run else None,
             rotation="1 week",
-            retention="4 weeks",
-            level="INFO"
+            retention="4 weeks"
         )
+    
+    def _is_cloud_run(self) -> bool:
+        """Check if running in Google Cloud Run."""
+        import os
+        return bool(os.environ.get("K_SERVICE") or os.environ.get("GOOGLE_CLOUD_PROJECT"))
 
     def run(
             self,

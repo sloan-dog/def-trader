@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from loguru import logger
 import time
 
+from src.utils.logging_config import setup_logging, log_exception
 from src.data_ingestion.ohlcv_fetcher import OHLCVFetcher
 from src.data_ingestion.macro_data_fetcher import MacroDataFetcher
 from src.feature_engineering.technical_indicators import TechnicalIndicatorCalculator
@@ -22,6 +23,7 @@ class BackfillJob:
 
     def __init__(self):
         """Initialize backfill components."""
+        self.is_cloud_run = self._is_cloud_run()
         self.ohlcv_fetcher = OHLCVFetcher()
         self.macro_fetcher = MacroDataFetcher()
         self.indicator_calculator = TechnicalIndicatorCalculator()
@@ -29,13 +31,18 @@ class BackfillJob:
         self.bq_client = BigQueryClient()
         self.stocks_config = load_stocks_config()
 
-        # Configure logging
-        logger.add(
-            "logs/backfill_{time}.log",
+        # Configure logging with JSON format for Google Cloud
+        setup_logging(
+            level="INFO",
+            log_file="logs/backfill_{time}.log" if not self.is_cloud_run else None,
             rotation="100 MB",
-            retention="7 days",
-            level="INFO"
+            retention="7 days"
         )
+    
+    def _is_cloud_run(self) -> bool:
+        """Check if running in Google Cloud Run."""
+        import os
+        return bool(os.environ.get("K_SERVICE") or os.environ.get("GOOGLE_CLOUD_PROJECT"))
 
     def run(
             self,
