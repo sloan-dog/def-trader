@@ -108,19 +108,24 @@ class OHLCVFetcher:
         if tickers is None:
             tickers = self._get_all_tickers()
 
+        logger.info(f"Starting daily updates for {len(tickers)} tickers")
         results = {}
 
         for ticker in tickers:
             try:
+                logger.debug(f"Processing daily update for {ticker}")
+                
                 # Get latest date in BigQuery
                 latest_date = self.bq_client.get_latest_date('raw_ohlcv', ticker)
 
                 if latest_date:
                     # Fetch data since last update
                     start_date = (latest_date - timedelta(days=1)).strftime('%Y-%m-%d')
+                    logger.debug(f"Latest date for {ticker}: {latest_date}, fetching from {start_date}")
                 else:
                     # No data exists, fetch last N days
                     start_date = (datetime.now() - timedelta(days=lookback_days)).strftime('%Y-%m-%d')
+                    logger.debug(f"No existing data for {ticker}, fetching last {lookback_days} days from {start_date}")
 
                 # Fetch recent data
                 data = self._fetch_ticker_data(ticker, outputsize='compact')
@@ -134,10 +139,16 @@ class OHLCVFetcher:
                     if not new_data.empty:
                         results[ticker] = new_data
                         logger.info(f"Fetched {len(new_data)} new records for {ticker}")
+                    else:
+                        logger.info(f"No new data found for {ticker} after {start_date}")
+                else:
+                    logger.warning(f"No data returned for {ticker} during daily update")
 
             except Exception as e:
                 logger.error(f"Failed to fetch daily update for {ticker}: {e}")
+                logger.debug(f"Daily update exception for {ticker}: {type(e).__name__}: {str(e)}")
 
+        logger.info(f"Completed daily updates. Successfully fetched data for {len(results)} out of {len(tickers)} tickers")
         return results
 
     def store_to_bigquery(
@@ -226,11 +237,21 @@ class OHLCVFetcher:
             outputsize: str = 'full'
     ) -> Optional[pd.DataFrame]:
         """Fetch data for a single ticker."""
+        logger.info(f"Fetching data for ticker: {ticker} (outputsize: {outputsize})")
+        
         try:
             data = self.av_client.get_daily_ohlcv(ticker, outputsize)
+            
+            if data is not None and not data.empty:
+                logger.info(f"Successfully fetched {len(data)} records for {ticker}")
+                logger.debug(f"Date range for {ticker}: {data['date'].min()} to {data['date'].max()}")
+            else:
+                logger.warning(f"Empty or None data returned for {ticker}")
+                
             return data
         except Exception as e:
             logger.error(f"Error fetching {ticker}: {e}")
+            logger.debug(f"Full exception details for {ticker}: {type(e).__name__}: {str(e)}")
             return None
 
     def _get_all_tickers(self) -> List[str]:

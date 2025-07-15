@@ -48,7 +48,9 @@ class AlphaVantageClient:
     def _make_request(self, params: Dict) -> Dict:
         """Make API request with error handling."""
         params['apikey'] = self.api_key
-
+        
+        logger.debug(f"Making API request with params: {params}")
+        
         self._rate_limit_wait()
 
         try:
@@ -57,21 +59,24 @@ class AlphaVantageClient:
                 params=params,
                 timeout=self.timeout
             )
+            logger.debug(f"Response status: {response.status_code}")
             response.raise_for_status()
 
             data = response.json()
+            logger.debug(f"Response data keys: {list(data.keys())}")
 
             # Check for API errors
             if "Error Message" in data:
+                logger.error(f"API Error for params {params}: {data['Error Message']}")
                 raise ValueError(f"API Error: {data['Error Message']}")
             if "Note" in data:
-                logger.warning(f"API Note: {data['Note']}")
+                logger.warning(f"API Note for params {params}: {data['Note']}")
                 raise ValueError("API call frequency limit reached")
 
             return data
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"Request failed: {e}")
+            logger.error(f"Request failed for params {params}: {e}")
             raise
 
     def get_daily_ohlcv(
@@ -80,6 +85,8 @@ class AlphaVantageClient:
             outputsize: str = 'full'
     ) -> pd.DataFrame:
         """Fetch daily OHLCV data for a symbol."""
+        logger.info(f"Fetching daily OHLCV data for {symbol} with outputsize={outputsize}")
+        
         params = {
             'function': 'TIME_SERIES_DAILY_ADJUSTED',
             'symbol': symbol,
@@ -90,8 +97,23 @@ class AlphaVantageClient:
 
         # Parse time series data
         time_series = data.get('Time Series (Daily)', {})
-
+        
+        logger.debug(f"Time series data found for {symbol}: {len(time_series)} days")
+        
         if not time_series:
+            logger.error(f"No time series data in response for {symbol}")
+            logger.debug(f"Full response data for {symbol}: {data}")
+            
+            # Check for common API response patterns
+            if 'Meta Data' in data:
+                logger.info(f"Meta data found for {symbol}: {data['Meta Data']}")
+            if 'Information' in data:
+                logger.warning(f"API Information message for {symbol}: {data['Information']}")
+            if 'Error Message' in data:
+                logger.error(f"API Error Message for {symbol}: {data['Error Message']}")
+            if 'Note' in data:
+                logger.warning(f"API Note for {symbol}: {data['Note']}")
+                
             raise ValueError(f"No data returned for {symbol}")
 
         # Convert to DataFrame
