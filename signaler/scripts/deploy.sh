@@ -252,13 +252,29 @@ gcloud run deploy prediction-api \
     --timeout 900 \
     --max-instances 10
 
+# Deploy backfill service
+print_status "Deploying backfill service..."
+gcloud run deploy backfill-service \
+    --image gcr.io/$PROJECT_ID/trading-system/api:latest \
+    --platform managed \
+    --region $REGION \
+    --no-allow-unauthenticated \
+    --service-account trading-system@$PROJECT_ID.iam.gserviceaccount.com \
+    --memory 8Gi \
+    --cpu 4 \
+    --timeout 3600 \
+    --max-instances 5 \
+    --command uvicorn,src.api.backfill_service:app,--host,0.0.0.0,--port,8080
+
 # Get service URLs
 INGESTION_URL=$(gcloud run services describe daily-ingestion --region=$REGION --format="value(status.url)")
 API_URL=$(gcloud run services describe prediction-api --region=$REGION --format="value(status.url)")
+BACKFILL_URL=$(gcloud run services describe backfill-service --region=$REGION --format="value(status.url)")
 
 print_status "Service URLs:"
 print_status "  Ingestion Service: $INGESTION_URL"
 print_status "  API Service: $API_URL"
+print_status "  Backfill Service: $BACKFILL_URL"
 
 # Update Cloud Scheduler jobs
 print_status "Setting up Cloud Scheduler jobs..."

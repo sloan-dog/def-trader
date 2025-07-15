@@ -192,6 +192,19 @@ module "cloud_run" {
         BQ_DATASET     = var.bigquery_dataset
       }
     }
+
+    backfill_service = {
+      name   = "backfill-service"
+      # Use Google's hello world image as placeholder
+      # CI/CD will update this, and Terraform will ignore changes
+      image  = "us-docker.pkg.dev/cloudrun/container/hello"
+      cpu    = "4"
+      memory = "8Gi"
+      env_vars = {
+        GCP_PROJECT_ID = var.project_id
+        BQ_DATASET     = var.bigquery_dataset
+      }
+    }
   }
 }
 
@@ -226,6 +239,16 @@ module "cloud_scheduler" {
       description = "Weekly model training job"
       retry_count = 1
       max_retry_duration = "3600s"
+    }
+
+    hourly_backfill = {
+      name        = "hourly-backfill"
+      schedule    = "0 * * * *"  # Every hour
+      timezone    = "America/New_York"
+      target_url  = try("${module.cloud_run.service_urls["backfill_service"]}/backfill/hourly", "https://placeholder-url")
+      description = "Hourly backfill for recent market data"
+      retry_count = 3
+      max_retry_duration = "1800s"
     }
   }
 }

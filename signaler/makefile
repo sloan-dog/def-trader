@@ -147,6 +147,22 @@ backfill-ohlcv:
 		--end-date $(END_DATE) \
 		--data-types ohlcv
 
+backfill-historical:
+	python -m src.jobs.historical_backfill_job \
+		--start-year $(START_YEAR) \
+		--end-year $(END_YEAR) \
+		--batch-size $(BATCH_SIZE) \
+		--data-types ohlcv
+
+backfill-historical-status:
+	@if [ -z "$(BACKFILL_ID)" ]; then \
+		echo "Error: BACKFILL_ID is required"; \
+		exit 1; \
+	fi
+	./scripts/manage_historical_backfill.sh status \
+		--backfill-id $(BACKFILL_ID) \
+		--service-url $(BACKFILL_SERVICE_URL)
+
 daily-update:
 	trading-daily-ingestion --date $(DATE)
 
@@ -244,3 +260,7 @@ GCP_REGION ?= us-central1
 START_DATE ?= 2022-01-01
 END_DATE ?= $(shell date +%Y-%m-%d)
 DATE ?= $(shell date +%Y-%m-%d)
+START_YEAR ?= 1995
+END_YEAR ?= $(shell date +%Y)
+BATCH_SIZE ?= 20
+BACKFILL_SERVICE_URL ?= http://localhost:8080
