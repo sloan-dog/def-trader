@@ -10,6 +10,22 @@ on:
   schedule:
     # Run daily data quality checks
     - cron: '0 10 * * *'  # 10 AM UTC daily
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: false
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+          - development
+      debug:
+        description: 'Enable debug logging'
+        required: false
+        default: false
+        type: boolean
 
 env:
   GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
@@ -134,7 +150,7 @@ jobs:
       run:
         working-directory: ./signaler
 
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout code
@@ -223,7 +239,7 @@ jobs:
       run:
         working-directory: ./signaler
     needs: [build]
-    if: github.ref == 'refs/heads/develop'
+    if: (github.ref == 'refs/heads/develop' && github.event_name == 'push') || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
     environment: staging
 
     steps:
@@ -261,7 +277,7 @@ jobs:
     defaults:
       run:
         working-directory: ./signaler
-    if: github.ref == 'refs/heads/main'
+    if: (github.ref == 'refs/heads/main' && github.event_name == 'push') || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
     environment: production
 
     steps:
