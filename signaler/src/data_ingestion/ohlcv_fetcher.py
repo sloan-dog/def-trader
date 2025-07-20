@@ -121,7 +121,7 @@ class OHLCVFetcher:
 
                 if latest_date:
                     # Fetch data since last update
-                    start_date = (latest_date - timedelta(days=1)).strftime('%Y-%m-%d')
+                    start_date = (latest_date - pd.Timedelta(days=1)).strftime('%Y-%m-%d')
                     logger.debug(f"Latest date for {ticker}: {latest_date}, fetching from {start_date}")
                 else:
                     # No data exists, fetch last N days
