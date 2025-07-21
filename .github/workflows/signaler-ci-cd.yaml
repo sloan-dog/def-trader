@@ -280,7 +280,7 @@ jobs:
       - name: Deploy Cloud Run Jobs (Staging)
         run: |
           # Deploy daily ingestion job (staging)
-          gcloud run jobs replace \
+          gcloud run jobs replace daily-ingestion-job \
             --project=${{ env.GCP_PROJECT_ID }} \
             --region=${{ env.GCP_REGION }} \
             --source=cloud-run-job.yaml
@@ -292,7 +292,7 @@ jobs:
             --image=gcr.io/${{ env.GCP_PROJECT_ID }}/daily-ingestion-job:${{ github.sha }}
           
           # Deploy backfill job (staging)
-          gcloud run jobs replace \
+          gcloud run jobs replace backfill-job \
             --project=${{ env.GCP_PROJECT_ID }} \
             --region=${{ env.GCP_REGION }} \
             --source=cloud-run-backfill-job.yaml
@@ -340,7 +340,7 @@ jobs:
       - name: Deploy Cloud Run Jobs (Production)
         run: |
           # Deploy daily ingestion job
-          gcloud run jobs replace \
+          gcloud run jobs replace daily-ingestion-job \
             --project=${{ env.GCP_PROJECT_ID }} \
             --region=${{ env.GCP_REGION }} \
             --source=cloud-run-job.yaml
@@ -352,7 +352,7 @@ jobs:
             --image=gcr.io/${{ env.GCP_PROJECT_ID }}/daily-ingestion-job:${{ github.sha }}
           
           # Deploy backfill job
-          gcloud run jobs replace \
+          gcloud run jobs replace backfill-job \
             --project=${{ env.GCP_PROJECT_ID }} \
             --region=${{ env.GCP_REGION }} \
             --source=cloud-run-backfill-job.yaml
