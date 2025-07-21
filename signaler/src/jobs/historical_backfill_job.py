@@ -11,7 +11,7 @@ from typing import List, Optional
 import pandas as pd
 from loguru import logger
 
-from src.utils.logging_config import setup_logging
+from src.shared_logging import setup_logging
 from src.utils.bigquery.client import BigQueryClient
 from src.utils.bigquery.backfill_tracker import BackfillTracker
 from src.data_ingestion.ohlcv_fetcher import OHLCVFetcher

@@ -13,7 +13,7 @@ from loguru import logger
 
 from src.jobs.backfill_job import BackfillJob
 from src.jobs.historical_backfill_job import HistoricalBackfillJob
-from src.utils.logging_config import setup_logging
+from src.shared_logging import setup_logging
 from src.utils.bigquery.client import BigQueryClient
 from src.utils.bigquery.backfill_tracker import BackfillTracker
 

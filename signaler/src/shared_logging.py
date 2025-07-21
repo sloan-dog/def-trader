@@ -1,5 +1,7 @@
 """
-Centralized logging configuration for Google Cloud Run compatibility.
+Shared logging module for all Cloud Run apps in the monorepo.
+
+This provides consistent, structured JSON logging that works well with Google Cloud Logging.
 """
 import sys
 import json
@@ -15,6 +17,12 @@ def create_structured_log(record: Dict[str, Any]) -> str:
     Create a structured log entry compatible with Google Cloud Logging.
     
     This creates a single JSON object that Google Cloud will treat as one log entry.
+    
+    Args:
+        record: Loguru record dictionary
+        
+    Returns:
+        JSON string representation of the log entry
     """
     # Base log structure
     log_entry = {
@@ -59,7 +67,8 @@ def setup_logging(
     enable_json: bool = None,
     log_file: str = None,
     rotation: str = "1 day",
-    retention: str = "30 days"
+    retention: str = "30 days",
+    app_name: str = None
 ):
     """
     Configure logging for the application.
@@ -70,6 +79,7 @@ def setup_logging(
         log_file: Optional log file path for file logging
         rotation: Log file rotation policy
         retention: Log file retention policy
+        app_name: Name of the application for logging context
     """
     # Remove default logger
     logger.remove()
@@ -84,6 +94,10 @@ def setup_logging(
         # JSON format for Google Cloud Logging
         def json_sink(message):
             try:
+                # Add app name to the log record if provided
+                if app_name:
+                    message.record["extra"]["app_name"] = app_name
+                
                 log_json = create_structured_log(message.record)
                 # Write to stderr with newline to ensure it's treated as one log entry
                 sys.stderr.write(log_json + "\n")
@@ -104,9 +118,14 @@ def setup_logging(
         )
     else:
         # Human-readable format for local development
+        format_str = "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level>"
+        if app_name:
+            format_str += f" | <cyan>{app_name}</cyan>"
+        format_str += " | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+        
         logger.add(
             sys.stderr,
-            format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+            format=format_str,
             level=level,
             backtrace=True,
             diagnose=True,
@@ -119,6 +138,10 @@ def setup_logging(
         if enable_json:
             def json_file_sink(message):
                 try:
+                    # Add app name to the log record if provided
+                    if app_name:
+                        message.record["extra"]["app_name"] = app_name
+                    
                     log_json = create_structured_log(message.record)
                     with open(log_file, 'a') as f:
                         f.write(log_json + "\n")
@@ -138,9 +161,14 @@ def setup_logging(
                 enqueue=True
             )
         else:
+            format_str = "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8}"
+            if app_name:
+                format_str += f" | {app_name}"
+            format_str += " | {name}:{function}:{line} - {message}"
+            
             logger.add(
                 log_file,
-                format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}",
+                format=format_str,
                 level=level,
                 rotation=rotation,
                 retention=retention,
@@ -149,7 +177,7 @@ def setup_logging(
                 enqueue=True
             )
     
-    logger.info(f"Logging configured: level={level}, json_format={enable_json}, file={log_file}")
+    logger.info(f"Logging configured: level={level}, json_format={enable_json}, file={log_file}, app_name={app_name}")
 
 
 def log_exception(message: str, exception: Exception = None, **kwargs):
@@ -186,3 +214,23 @@ def log_with_context(message: str, level: str = "INFO", **kwargs):
         logger.critical(message, **kwargs)
     else:
         logger.info(message, **kwargs)
+
+
+def is_cloud_run() -> bool:
+    """
+    Check if running in Google Cloud Run environment.
+    
+    Returns:
+        True if running in Cloud Run, False otherwise
+    """
+    return bool(os.environ.get("K_SERVICE") or os.environ.get("GOOGLE_CLOUD_PROJECT"))
+
+
+def get_app_name() -> str:
+    """
+    Get the application name from environment variables.
+    
+    Returns:
+        Application name or 'unknown' if not set
+    """
+    return os.environ.get("K_SERVICE", os.environ.get("APP_NAME", "unknown")) 

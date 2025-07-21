@@ -8,7 +8,7 @@ from loguru import logger
 import mlflow
 import json
 
-from src.utils.logging_config import setup_logging, log_exception
+from src.shared_logging import setup_logging, log_exception
 from src.training.trainer import GNNTrainer
 from src.training.prediction_pipeline import PredictionPipeline
 from src.training.metrics import ModelMetrics

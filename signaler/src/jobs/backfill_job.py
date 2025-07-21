@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from loguru import logger
 import time
 
-from src.utils.logging_config import setup_logging, log_exception
+from src.shared_logging import setup_logging, log_exception
 from src.data_ingestion.ohlcv_fetcher import OHLCVFetcher
 from src.data_ingestion.macro_data_fetcher import MacroDataFetcher
 from src.feature_engineering.technical_indicators import TechnicalIndicatorCalculator

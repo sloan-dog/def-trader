@@ -8,7 +8,7 @@ from loguru import logger
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from src.utils.logging_config import setup_logging, log_exception
+from src.shared_logging import setup_logging, log_exception
 from config.settings import (
     load_stocks_config,
     INGESTION_CONFIG,
@@ -139,16 +139,24 @@ class OHLCVFetcher:
 
                     if not new_data.empty:
                         results[ticker] = new_data
-                        logger.info(f"Fetched {len(new_data)} new records for {ticker}")
+                        logger.info(f"Fetched {len(new_data)} new records for {ticker}",
+                                    ticker=ticker,
+                                    records_fetched=len(new_data),
+                                    date_range=f"{new_data['date'].min()} to {new_data['date'].max()}")
                     else:
-                        logger.info(f"No new data found for {ticker} after {start_date}")
+                        logger.info(f"No new data found for {ticker} after {start_date}",
+                                    ticker=ticker,
+                                    start_date=start_date)
                 else:
-                    logger.warning(f"No data returned for {ticker} during daily update")
+                    logger.warning(f"No data returned for {ticker} during daily update", ticker=ticker)
 
             except Exception as e:
                 log_exception(f"Failed to fetch daily update for {ticker}", exception=e, ticker=ticker)
 
-        logger.info(f"Completed daily updates. Successfully fetched data for {len(results)} out of {len(tickers)} tickers")
+        logger.info(f"Completed daily updates. Successfully fetched data for {len(results)} out of {len(tickers)} tickers",
+                    successful_tickers=len(results),
+                    total_tickers=len(tickers),
+                    success_rate=len(results)/len(tickers) if tickers else 0)
         return results
 
     def store_to_bigquery(
@@ -174,7 +182,10 @@ class OHLCVFetcher:
                 if validate:
                     is_valid, issues = self.validator.validate_ohlcv(df)
                     if not is_valid:
-                        logger.warning(f"Validation issues for {ticker}: {issues}")
+                        logger.warning(f"Validation issues for {ticker}: {issues}",
+                                      ticker=ticker,
+                                      validation_issues=issues,
+                                      record_count=len(df))
                         # Continue with storage but log the issues
 
                 # Ensure required columns
@@ -203,10 +214,16 @@ class OHLCVFetcher:
                         removed_count = initial_count - len(df)
 
                         if removed_count > 0:
-                            logger.info(f"Filtered out {removed_count} duplicate dates for {ticker}")
+                            logger.info(f"Filtered out {removed_count} duplicate dates for {ticker}",
+                                        ticker=ticker,
+                                        duplicates_removed=removed_count,
+                                        initial_count=initial_count,
+                                        final_count=len(df))
 
                         if df.empty:
-                            logger.info(f"All data for {ticker} already exists, skipping")
+                            logger.info(f"All data for {ticker} already exists, skipping",
+                                        ticker=ticker,
+                                        existing_dates_count=len(existing_dates))
                             results[ticker] = True
                             continue
 
@@ -220,10 +237,13 @@ class OHLCVFetcher:
                     )
 
                     results[ticker] = True
-                    logger.info(f"Stored {len(df)} records for {ticker}")
+                    logger.info(f"Stored {len(df)} records for {ticker}",
+                                ticker=ticker,
+                                records_stored=len(df),
+                                date_range=f"{df['date'].min()} to {df['date'].max()}")
                 else:
                     results[ticker] = True
-                    logger.info(f"No new data to store for {ticker}")
+                    logger.info(f"No new data to store for {ticker}", ticker=ticker)
 
             except Exception as e:
                 log_exception(f"Failed to store data for {ticker}", exception=e, ticker=ticker)

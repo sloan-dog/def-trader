@@ -8,7 +8,7 @@ from typing import Dict
 from loguru import logger
 import traceback
 
-from src.utils.logging_config import setup_logging, log_exception
+from src.shared_logging import setup_logging, log_exception
 from src.data_ingestion.ohlcv_fetcher import OHLCVUpdater
 from src.data_ingestion.macro_data_fetcher import MacroDataUpdater
 from src.data_ingestion.alpha_vantage_client import AlphaVantageClient
@@ -25,6 +25,16 @@ class DailyIngestionJob:
     def __init__(self):
         """Initialize job components."""
         self.is_cloud_run = self._is_cloud_run()
+        
+        # Configure logging with JSON format for Google Cloud
+        setup_logging(
+            level="INFO",
+            log_file="logs/daily_ingestion_{time}.log" if not self.is_cloud_run else None,
+            rotation="1 day",
+            retention="30 days",
+            app_name="signaler-daily-ingestion"
+        )
+        
         self.ohlcv_updater = OHLCVUpdater()
         self.macro_updater = MacroDataUpdater()
         self.indicator_calculator = TechnicalIndicatorCalculator()
@@ -36,14 +46,6 @@ class DailyIngestionJob:
         """Check if running in Google Cloud Run."""
         import os
         return bool(os.environ.get("K_SERVICE") or os.environ.get("GOOGLE_CLOUD_PROJECT"))
-
-        # Configure logging with JSON format for Google Cloud
-        setup_logging(
-            level="INFO",
-            log_file="logs/daily_ingestion_{time}.log" if not self._is_cloud_run() else None,
-            rotation="1 day",
-            retention="30 days"
-        )
 
     def run(self, date: str = None):
         """Run daily ingestion job."""
@@ -371,14 +373,23 @@ class DailyIngestionJob:
 @click.option('--date', default=None, help='Date to run ingestion for (YYYY-MM-DD)')
 def main(date):
     """Run daily data ingestion job."""
-    job = DailyIngestionJob()
-    results = job.run(date)
+    try:
+        job = DailyIngestionJob()
+        results = job.run(date)
 
-    if results['overall_success']:
-        logger.info("Daily ingestion completed successfully")
-        sys.exit(0)
-    else:
-        logger.error("Daily ingestion failed - see logs for details")
+        if results['overall_success']:
+            logger.info("Daily ingestion completed successfully", 
+                       duration=results.get('duration', 0),
+                       steps_completed=len(results.get('steps', {})))
+            sys.exit(0)
+        else:
+            logger.error("Daily ingestion failed - see logs for details",
+                        duration=results.get('duration', 0),
+                        error=results.get('error', 'Unknown error'),
+                        steps=results.get('steps', {}))
+            sys.exit(1)
+    except Exception as e:
+        log_exception("Fatal error in daily ingestion job", exception=e)
         sys.exit(1)
 
 

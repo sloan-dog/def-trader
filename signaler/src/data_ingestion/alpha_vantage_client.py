@@ -101,18 +101,23 @@ class AlphaVantageClient:
         logger.debug(f"Time series data found for {symbol}: {len(time_series)} days")
         
         if not time_series:
-            logger.error(f"No time series data in response for {symbol}")
-            logger.debug(f"Full response data for {symbol}: {data}")
+            logger.error(f"No time series data in response for {symbol}", 
+                        symbol=symbol,
+                        response_keys=list(data.keys()),
+                        has_meta_data='Meta Data' in data,
+                        has_information='Information' in data,
+                        has_error='Error Message' in data,
+                        has_note='Note' in data)
             
             # Check for common API response patterns
             if 'Meta Data' in data:
-                logger.info(f"Meta data found for {symbol}: {data['Meta Data']}")
+                logger.info(f"Meta data found for {symbol}", symbol=symbol, meta_data=data['Meta Data'])
             if 'Information' in data:
-                logger.warning(f"API Information message for {symbol}: {data['Information']}")
+                logger.warning(f"API Information message for {symbol}", symbol=symbol, information=data['Information'])
             if 'Error Message' in data:
-                logger.error(f"API Error Message for {symbol}: {data['Error Message']}")
+                logger.error(f"API Error Message for {symbol}", symbol=symbol, error_message=data['Error Message'])
             if 'Note' in data:
-                logger.warning(f"API Note for {symbol}: {data['Note']}")
+                logger.warning(f"API Note for {symbol}", symbol=symbol, note=data['Note'])
                 
             raise ValueError(f"No data returned for {symbol}")
 
