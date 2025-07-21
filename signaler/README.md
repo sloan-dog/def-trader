@@ -37,7 +37,8 @@ This system combines:
 
 #### Infrastructure
 - **BigQuery**: Scalable data warehouse for all historical data
-- **Cloud Run**: Containerized services for data ingestion and predictions
+- **Cloud Run**: Containerized services for predictions and backfill
+- **Cloud Run Jobs**: Batch processing for data ingestion (more efficient than services)
 - **Vertex AI**: Distributed model training
 - **Cloud Scheduler**: Automated job orchestration
 
@@ -89,8 +90,42 @@ This will:
 1. Enable required GCP APIs
 2. Build and push Docker images
 3. Deploy infrastructure with Terraform / Open Tofu
-4. Set up Cloud Run services
+4. Set up Cloud Run services and jobs
 5. Create scheduled jobs
+
+#### Cloud Run Jobs for Batch Processing
+
+Both the daily ingestion and backfill jobs are deployed as **Cloud Run Jobs** instead of services, which is more appropriate for batch processing:
+
+**Benefits:**
+- **No HTTP overhead** - Direct job execution
+- **Better resource utilization** - Can use more CPU/memory efficiently
+- **Proper retry logic** - Built-in retry mechanisms
+- **Cost effective** - Only pay for actual execution time
+- **Simpler monitoring** - Job-specific metrics and logs
+
+**Deployment:**
+```bash
+# Deploy the ingestion job
+./scripts/deploy_ingestion_job.sh YOUR_PROJECT_ID us-central1
+
+# Deploy the backfill job
+./scripts/deploy_backfill_job.sh YOUR_PROJECT_ID us-central1
+
+# Execute jobs manually for testing
+gcloud run jobs execute daily-ingestion-job --region=us-central1
+gcloud run jobs execute backfill-job --region=us-central1 --args="--type=hourly"
+
+# View job executions
+gcloud run jobs executions list --job=daily-ingestion-job --region=us-central1
+gcloud run jobs executions list --job=backfill-job --region=us-central1
+```
+
+**Backfill Job Types:**
+- **Hourly**: Last 2 days of OHLCV data
+- **Daily**: Last 7 days of OHLCV and macro data
+- **Weekly**: Last 30 days of all data types
+- **Historical**: Years of historical data with progress tracking
 
 ### Running Locally
 
@@ -223,7 +258,13 @@ trading-signal-system/
 │   ├── utils/           # Utilities
 │   └── jobs/            # Orchestration jobs
 ├── terraform/           # Infrastructure as code
+│   └── modules/
+│       ├── cloud_run/   # Cloud Run services
+│       ├── cloud_run_jobs/  # Cloud Run Jobs
+│       └── cloud_scheduler/ # Scheduled jobs
 ├── docker/              # Containerization
+│   ├── Dockerfile.ingestion.job  # Batch job container
+│   └── Dockerfile.ingestion      # Service container (legacy)
 ├── tests/               # Unit and integration tests
 ├── notebooks/           # Analysis notebooks
 └── scripts/             # Deployment scripts
@@ -280,6 +321,7 @@ pytest tests/
 Estimated monthly costs:
 - BigQuery: ~$50-100 (depending on data volume)
 - Cloud Run: ~$20-50 (based on usage)
+- Cloud Run Jobs: ~$10-30 (batch processing, pay per execution)
 - Vertex AI: ~$100-200 (training frequency)
 - Cloud Storage: ~$10-20
 
@@ -287,6 +329,7 @@ Tips:
 - Use BigQuery partitioning
 - Schedule jobs during off-peak hours
 - Clean up old model artifacts
+- Cloud Run Jobs are more cost-effective for batch workloads
 
 ## Future Enhancements
 

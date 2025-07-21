@@ -167,19 +167,6 @@ module "cloud_run" {
   service_account    = google_service_account.trading_system.email
 
   services = {
-    daily_ingestion = {
-      name   = "daily-ingestion"
-      # Use Google's hello world image as placeholder
-      # CI/CD will update this, and Terraform will ignore changes
-      image  = "us-docker.pkg.dev/cloudrun/container/hello"
-      cpu    = "2"
-      memory = "4Gi"
-      env_vars = {
-        GCP_PROJECT_ID = var.project_id
-        BQ_DATASET     = var.bigquery_dataset
-      }
-    }
-
     prediction_service = {
       name   = "prediction-service"
       # Use Google's hello world image as placeholder
@@ -193,8 +180,21 @@ module "cloud_run" {
       }
     }
 
-    backfill_service = {
-      name   = "backfill-service"
+
+  }
+}
+
+# Cloud Run Jobs
+module "cloud_run_jobs" {
+  source = "./modules/cloud_run_jobs"
+
+  project_id      = var.project_id
+  region          = var.region
+  service_account = google_service_account.trading_system.email
+
+  jobs = {
+    daily_ingestion = {
+      name   = "daily-ingestion-job"
       # Use Google's hello world image as placeholder
       # CI/CD will update this, and Terraform will ignore changes
       image  = "us-docker.pkg.dev/cloudrun/container/hello"
@@ -204,17 +204,31 @@ module "cloud_run" {
         GCP_PROJECT_ID = var.project_id
         BQ_DATASET     = var.bigquery_dataset
       }
+      timeout = "7200s"  # 2 hours for ingestion job
+    }
+
+    backfill = {
+      name   = "backfill-job"
+      # Use Google's hello world image as placeholder
+      # CI/CD will update this, and Terraform will ignore changes
+      image  = "us-docker.pkg.dev/cloudrun/container/hello"
+      cpu    = "4"
+      memory = "8Gi"
+      env_vars = {
+        GCP_PROJECT_ID = var.project_id
+        BQ_DATASET     = var.bigquery_dataset
+      }
+      timeout = "7200s"  # 2 hours for backfill job
     }
   }
 }
 
 # Cloud Scheduler jobs
-# Cloud Scheduler jobs
 module "cloud_scheduler" {
   source = "./modules/cloud_scheduler"
 
-  # Add explicit dependency on Cloud Run module
-  depends_on = [module.cloud_run]
+  # Add explicit dependency on Cloud Run modules
+  depends_on = [module.cloud_run, module.cloud_run_jobs]
 
   project_id      = var.project_id
   region          = var.region
@@ -225,10 +239,15 @@ module "cloud_scheduler" {
       name        = "daily-data-ingestion"
       schedule    = "0 18 * * MON-FRI"  # 6 PM EST on weekdays
       timezone    = "America/New_York"
-      target_url  = try(module.cloud_run.service_urls["daily_ingestion"], "https://placeholder-url")
+      # Use Cloud Run Job execution URL
+      target_url  = try("https://${var.region}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${var.project_id}/jobs/${module.cloud_run_jobs.job_names["daily_ingestion"]}/executions", "https://placeholder-url")
       description = "Daily market data ingestion job"
       retry_count = 3
       max_retry_duration = "600s"
+      http_method = "POST"
+      headers = {
+        "Content-Type" = "application/json"
+      }
     }
 
     weekly_training = {
@@ -245,10 +264,15 @@ module "cloud_scheduler" {
       name        = "hourly-backfill"
       schedule    = "0 * * * *"  # Every hour
       timezone    = "America/New_York"
-      target_url  = try("${module.cloud_run.service_urls["backfill_service"]}/backfill/hourly", "https://placeholder-url")
+      # Use Cloud Run Job execution URL instead of service URL
+      target_url  = try("https://${var.region}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${var.project_id}/jobs/${module.cloud_run_jobs.job_names["backfill"]}/executions", "https://placeholder-url")
       description = "Hourly backfill for recent market data"
       retry_count = 3
       max_retry_duration = "1800s"
+      http_method = "POST"
+      headers = {
+        "Content-Type" = "application/json"
+      }
     }
   }
 }

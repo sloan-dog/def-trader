@@ -1,0 +1,29 @@
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: backfill-job
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    template:
+      serviceAccountName: trading-system@trading-signals-420-69.iam.gserviceaccount.com
+      containers:
+      - image: gcr.io/trading-signals-420-69/backfill-job:latest
+        env:
+        - name: GCP_PROJECT_ID
+          value: "trading-signals-420-69"
+        - name: BQ_DATASET
+          value: "trading_signals"
+        - name: ALPHA_VANTAGE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: alpha-vantage-api-key
+              key: latest
+        resources:
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+      timeoutSeconds: 7200  # 2 hours
+      maxRetryCount: 3
+      taskCount: 1 
