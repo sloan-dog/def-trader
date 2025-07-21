@@ -280,10 +280,9 @@ jobs:
       - name: Deploy Cloud Run Jobs (Staging)
         run: |
           # Deploy daily ingestion job (staging)
-          gcloud run jobs replace daily-ingestion-job \
+          gcloud run jobs replace cloud-run-job.yaml \
             --project=${{ env.GCP_PROJECT_ID }} \
-            --region=${{ env.GCP_REGION }} \
-            --source=cloud-run-job.yaml
+            --region=${{ env.GCP_REGION }}
           
           # Update ingestion job with new image
           gcloud run jobs update daily-ingestion-job \
@@ -292,10 +291,9 @@ jobs:
             --image=gcr.io/${{ env.GCP_PROJECT_ID }}/daily-ingestion-job:${{ github.sha }}
           
           # Deploy backfill job (staging)
-          gcloud run jobs replace backfill-job \
+          gcloud run jobs replace cloud-run-backfill-job.yaml \
             --project=${{ env.GCP_PROJECT_ID }} \
-            --region=${{ env.GCP_REGION }} \
-            --source=cloud-run-backfill-job.yaml
+            --region=${{ env.GCP_REGION }}
           
           # Update backfill job with new image
           gcloud run jobs update backfill-job \
@@ -340,10 +338,9 @@ jobs:
       - name: Deploy Cloud Run Jobs (Production)
         run: |
           # Deploy daily ingestion job
-          gcloud run jobs replace daily-ingestion-job \
+          gcloud run jobs replace cloud-run-job.yaml \
             --project=${{ env.GCP_PROJECT_ID }} \
-            --region=${{ env.GCP_REGION }} \
-            --source=cloud-run-job.yaml
+            --region=${{ env.GCP_REGION }}
           
           # Update ingestion job with new image
           gcloud run jobs update daily-ingestion-job \
@@ -352,10 +349,9 @@ jobs:
             --image=gcr.io/${{ env.GCP_PROJECT_ID }}/daily-ingestion-job:${{ github.sha }}
           
           # Deploy backfill job
-          gcloud run jobs replace backfill-job \
+          gcloud run jobs replace cloud-run-backfill-job.yaml \
             --project=${{ env.GCP_PROJECT_ID }} \
-            --region=${{ env.GCP_REGION }} \
-            --source=cloud-run-backfill-job.yaml
+            --region=${{ env.GCP_REGION }}
           
           # Update backfill job with new image
           gcloud run jobs update backfill-job \
