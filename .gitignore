@@ -421,4 +421,4 @@ core.*
 # yarn.lock
 
 venv
-*/venv
+*/venv*tfplan
