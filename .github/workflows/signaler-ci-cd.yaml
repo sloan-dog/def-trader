@@ -273,7 +273,9 @@ jobs:
 
       - name: Copy Cloud Run Job configurations
         run: |
-          cp cloud-run-job.yaml cloud-run-backfill-job.yaml ./
+          # Copy files only if they don't already exist in current directory
+          [ -f ./cloud-run-job.yaml ] || cp cloud-run-job.yaml ./
+          [ -f ./cloud-run-backfill-job.yaml ] || cp cloud-run-backfill-job.yaml ./
 
       - name: Deploy Cloud Run Jobs (Staging)
         run: |
@@ -331,7 +333,9 @@ jobs:
 
       - name: Copy Cloud Run Job configurations
         run: |
-          cp cloud-run-job.yaml cloud-run-backfill-job.yaml ./
+          # Copy files only if they don't already exist in current directory
+          [ -f ./cloud-run-job.yaml ] || cp cloud-run-job.yaml ./
+          [ -f ./cloud-run-backfill-job.yaml ] || cp cloud-run-backfill-job.yaml ./
 
       - name: Deploy Cloud Run Jobs (Production)
         run: |
