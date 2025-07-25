@@ -10,25 +10,26 @@ spec:
       annotations:
         run.googleapis.com/execution-environment: gen2
     spec:
-      serviceAccountName: trading-system@trading-signals-420-69.iam.gserviceaccount.com
-      timeoutSeconds: 7200  # 2 hours
       taskCount: 1
       parallelism: 1
-      taskTimeoutSeconds: 7200
-      containers:
-      - image: gcr.io/trading-signals-420-69/daily-ingestion-job:latest
-        env:
-        - name: GCP_PROJECT_ID
-          value: "trading-signals-420-69"
-        - name: BQ_DATASET
-          value: "trading_signals"
-        - name: ALPHA_VANTAGE_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: alpha-vantage-api-key
-              key: latest
-        resources:
-          limits:
-            cpu: "4"
-            memory: "8Gi"
-      maxRetries: 3 
+      template:
+        spec:
+          serviceAccountName: trading-system@trading-signals-420-69.iam.gserviceaccount.com
+          timeoutSeconds: 7200  # 2 hours
+          maxRetries: 3
+          containers:
+          - image: gcr.io/trading-signals-420-69/daily-ingestion-job:latest
+            env:
+            - name: GCP_PROJECT_ID
+              value: "trading-signals-420-69"
+            - name: BQ_DATASET
+              value: "trading_signals"
+            - name: ALPHA_VANTAGE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: alpha-vantage-api-key
+                  key: latest
+            resources:
+              limits:
+                cpu: "4"
+                memory: "8Gi" 
