@@ -26,4 +26,4 @@ ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
 # Run the backfill job
-CMD ["python", "-m", "src.jobs.backfill_job"] 
+ENTRYPOINT ["python", "-m", "src.jobs.backfill_job"] 
