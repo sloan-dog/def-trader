@@ -10,6 +10,7 @@ from loguru import logger
 from datetime import datetime
 import os
 from typing import Any, Dict, Optional
+import threading
 
 
 def create_structured_log(record: Dict[str, Any]) -> str:
@@ -177,6 +178,10 @@ def setup_logging(
                 enqueue=True
             )
     
+    # Install JSON exception hook for cloud environments
+    if enable_json:
+        install_json_excepthook(app_name)
+    
     logger.info(f"Logging configured: level={level}, json_format={enable_json}, file={log_file}, app_name={app_name}")
 
 
@@ -233,4 +238,62 @@ def get_app_name() -> str:
     Returns:
         Application name or 'unknown' if not set
     """
-    return os.environ.get("K_SERVICE", os.environ.get("APP_NAME", "unknown")) 
+    return os.environ.get("K_SERVICE", os.environ.get("APP_NAME", "unknown"))
+
+
+def install_json_excepthook(app_name: str = None):
+    """
+    Install a custom exception hook that formats uncaught exceptions as JSON.
+    This ensures that even fatal errors are logged in structured format.
+    
+    Args:
+        app_name: Name of the application for logging context
+    """
+    def json_excepthook(exc_type, exc_value, exc_traceback):
+        """Custom exception hook that outputs JSON formatted errors."""
+        # Don't handle KeyboardInterrupt
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+            return
+        
+        # Create structured error log
+        error_log = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "severity": "CRITICAL",
+            "message": f"Uncaught exception: {exc_type.__name__}: {exc_value}",
+            "sourceLocation": {
+                "file": "unknown",
+                "line": 0,
+                "function": "<module>"
+            },
+            "exception": {
+                "type": exc_type.__name__,
+                "message": str(exc_value),
+                "traceback": "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+            }
+        }
+        
+        if app_name:
+            error_log["extra"] = {"app_name": app_name}
+        
+        # Extract source location from traceback if available
+        if exc_traceback:
+            tb_frame = exc_traceback.tb_frame
+            error_log["sourceLocation"] = {
+                "file": tb_frame.f_code.co_filename,
+                "line": exc_traceback.tb_lineno,
+                "function": tb_frame.f_code.co_name
+            }
+        
+        # Write JSON to stderr
+        sys.stderr.write(json.dumps(error_log, default=str, ensure_ascii=False) + "\n")
+        sys.stderr.flush()
+    
+    # Install the hook
+    sys.excepthook = json_excepthook
+    
+    # Also handle exceptions in threads
+    def thread_excepthook(args):
+        json_excepthook(args.exc_type, args.exc_value, args.exc_traceback)
+    
+    threading.excepthook = thread_excepthook 
