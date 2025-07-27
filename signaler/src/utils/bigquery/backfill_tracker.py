@@ -51,15 +51,31 @@ class BackfillTracker:
             {"name": "error_message", "type": "STRING", "mode": "NULLABLE"},
         ]
         
-        self.bq_client.create_table_if_not_exists(
-            self.progress_table,
-            progress_schema
-        )
+        # Convert schema to BigQuery SchemaField objects
+        from google.cloud import bigquery
         
-        self.bq_client.create_table_if_not_exists(
-            self.checkpoint_table,
-            checkpoint_schema
-        )
+        progress_fields = [
+            bigquery.SchemaField(field["name"], field["type"], mode=field["mode"])
+            for field in progress_schema
+        ]
+        
+        checkpoint_fields = [
+            bigquery.SchemaField(field["name"], field["type"], mode=field["mode"])
+            for field in checkpoint_schema
+        ]
+        
+        # Create tables using the existing create_table method
+        try:
+            self.bq_client.create_table(self.progress_table, progress_fields)
+        except Exception as e:
+            if "already exists" not in str(e):
+                raise
+                
+        try:
+            self.bq_client.create_table(self.checkpoint_table, checkpoint_fields)
+        except Exception as e:
+            if "already exists" not in str(e):
+                raise
     
     def start_backfill(
         self,
@@ -89,17 +105,18 @@ class BackfillTracker:
             'data_types': data_types,
             'total_months': total_months,
             'completed_months': 0,
-            'started_at': datetime.utcnow(),
-            'updated_at': datetime.utcnow(),
+            'started_at': pd.Timestamp.now(),
+            'updated_at': pd.Timestamp.now(),
             'completed_at': None,
             'error_message': None
         }])
         
-        # Use MERGE to upsert
-        self.bq_client.merge_dataframe(
+        # Insert the progress data
+        self.bq_client.insert_dataframe(
             progress_data,
             self.progress_table,
-            ['backfill_id']
+            if_exists='merge',
+            merge_keys=['backfill_id']
         )
         
         logger.info(f"Started backfill {backfill_id}: {start_year}-{end_year}")
@@ -113,10 +130,11 @@ class BackfillTracker:
         WHERE backfill_id = @backfill_id
         """
         
-        result = self.bq_client.query(
-            query,
-            {'backfill_id': backfill_id}
-        )
+        from google.cloud import bigquery
+        params = [
+            bigquery.ScalarQueryParameter('backfill_id', 'STRING', backfill_id)
+        ]
+        result = self.bq_client.query(query, params)
         
         if result.empty:
             return None
@@ -163,7 +181,7 @@ class BackfillTracker:
             'data_type': data_type,
             'status': 'failed' if error else 'completed',
             'records_fetched': records_fetched if not error else None,
-            'completed_at': datetime.utcnow(),
+            'completed_at': pd.Timestamp.now(),
             'error_message': error
         }])
         
@@ -199,14 +217,14 @@ class BackfillTracker:
             'current_year': next_year if not is_complete else year,
             'current_month': next_month if not is_complete else month,
             'status': 'completed' if is_complete else 'in_progress',
-            'updated_at': datetime.utcnow()
+            'updated_at': pd.Timestamp.now()
         }
         
         if increment_completed:
             updates['completed_months'] = status['completed_months'] + 1
         
         if is_complete:
-            updates['completed_at'] = datetime.utcnow()
+            updates['completed_at'] = pd.Timestamp.now()
         
         # Update the record
         self._update_progress_record(backfill_id, updates)
@@ -224,7 +242,18 @@ class BackfillTracker:
         params = {'backfill_id': backfill_id}
         params.update(updates)
         
-        self.bq_client.client.query(query, job_config=self.bq_client._get_query_config(params)).result()
+        from google.cloud import bigquery
+        query_params = []
+        for key, value in params.items():
+            if isinstance(value, datetime):
+                query_params.append(bigquery.ScalarQueryParameter(key, 'TIMESTAMP', value))
+            elif isinstance(value, int):
+                query_params.append(bigquery.ScalarQueryParameter(key, 'INT64', value))
+            else:
+                query_params.append(bigquery.ScalarQueryParameter(key, 'STRING', str(value)))
+        
+        job_config = bigquery.QueryJobConfig(query_parameters=query_params)
+        self.bq_client.client.query(query, job_config=job_config).result()
     
     def get_completed_months(
         self,
@@ -243,14 +272,13 @@ class BackfillTracker:
         ORDER BY year DESC, month DESC
         """
         
-        result = self.bq_client.query(
-            query,
-            {
-                'backfill_id': backfill_id,
-                'symbol': symbol,
-                'data_type': data_type
-            }
-        )
+        from google.cloud import bigquery
+        params = [
+            bigquery.ScalarQueryParameter('backfill_id', 'STRING', backfill_id),
+            bigquery.ScalarQueryParameter('symbol', 'STRING', symbol),
+            bigquery.ScalarQueryParameter('data_type', 'STRING', data_type)
+        ]
+        result = self.bq_client.query(query, params)
         
         return [(row['year'], row['month']) for _, row in result.iterrows()]
     
@@ -272,6 +300,6 @@ class BackfillTracker:
             {
                 'status': 'failed',
                 'error_message': error_message,
-                'updated_at': datetime.utcnow()
+                'updated_at': pd.Timestamp.now()
             }
         )

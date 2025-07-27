@@ -143,13 +143,14 @@ class HistoricalBackfillJob:
                     
                     # Fetch hourly data
                     month_str = f"{year}-{month:02d}"
-                    hourly_data = self.ohlcv_fetcher.alpha_vantage_client.get_hourly_ohlcv(
+                    hourly_data = self.ohlcv_fetcher.av_client.get_hourly_ohlcv(
                         symbol, month_str
                     )
                     
                     if hourly_data is not None and not hourly_data.empty:
-                        # Store to BigQuery
-                        self.ohlcv_fetcher.store_hourly_to_bigquery(hourly_data)
+                        # Store to BigQuery - wrap in dictionary as expected by store method
+                        data_dict = {symbol: hourly_data}
+                        self.ohlcv_fetcher.store_hourly_to_bigquery(data_dict)
                         records = len(hourly_data)
                         logger.info(f"Stored {records} hourly records for {symbol} {month_str}")
                         

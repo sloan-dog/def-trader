@@ -251,6 +251,103 @@ class OHLCVFetcher:
 
         return results
 
+    def store_hourly_to_bigquery(
+            self,
+            data_dict: Dict[str, pd.DataFrame],
+            validate: bool = True
+    ) -> Dict[str, bool]:
+        """
+        Store HOURLY OHLCV data to BigQuery.
+        
+        Args:
+            data_dict: Dictionary of DataFrames by ticker
+            validate: Whether to validate data before storing
+            
+        Returns:
+            Dictionary of success status by ticker
+        """
+        results = {}
+        
+        for ticker, df in data_dict.items():
+            try:
+                # Validate data
+                if validate:
+                    is_valid, issues = self.validator.validate_ohlcv(df)
+                    if not is_valid:
+                        logger.warning(f"Validation issues for {ticker}: {issues}")
+                
+                # Prepare DataFrame - ensure datetime column exists
+                df = df.copy()
+                if 'datetime' in df.columns:
+                    df['datetime'] = pd.to_datetime(df['datetime'])
+                    df['date'] = df['datetime'].dt.date
+                    df['hour'] = df['datetime'].dt.hour
+                else:
+                    logger.error(f"No datetime column found for {ticker}")
+                    results[ticker] = False
+                    continue
+                
+                # Ensure numeric columns
+                numeric_cols = ['open', 'high', 'low', 'close', 'volume', 'adjusted_close']
+                for col in numeric_cols:
+                    if col in df.columns:
+                        df[col] = pd.to_numeric(df[col], errors='coerce')
+                
+                # Remove duplicates
+                df = df.drop_duplicates(subset=['ticker', 'datetime'], keep='last')
+                
+                # Check for existing data to prevent duplicates
+                if self.bq_client.table_exists('raw_ohlcv_hourly') and not df.empty:
+                    min_datetime = df['datetime'].min()
+                    max_datetime = df['datetime'].max()
+                    
+                    query = f"""
+                    SELECT DISTINCT datetime
+                    FROM `{BQ_TABLES.get('raw_ohlcv_hourly', self.bq_client.dataset_ref + '.raw_ohlcv_hourly')}`
+                    WHERE ticker = '{ticker}'
+                      AND datetime BETWEEN '{min_datetime}' AND '{max_datetime}'
+                    """
+                    
+                    existing_data = self.bq_client.query(query)
+                    
+                    if not existing_data.empty:
+                        existing_datetimes = pd.to_datetime(existing_data['datetime'])
+                        initial_count = len(df)
+                        df = df[~df['datetime'].isin(existing_datetimes)]
+                        removed_count = initial_count - len(df)
+                        
+                        if removed_count > 0:
+                            logger.info(f"Filtered out {removed_count} duplicate hourly records for {ticker}")
+                        
+                        if df.empty:
+                            logger.info(f"All hourly data for {ticker} already exists")
+                            results[ticker] = True
+                            continue
+                
+                # Store to BigQuery hourly table
+                if not df.empty:
+                    # Add insertion timestamp
+                    df['inserted_at'] = pd.Timestamp.now()
+                    
+                    self.bq_client.insert_dataframe(
+                        df,
+                        'raw_ohlcv_hourly',
+                        chunk_size=INGESTION_CONFIG['chunk_size'],
+                        if_exists='append'
+                    )
+                    
+                    results[ticker] = True
+                    logger.info(f"Stored {len(df)} hourly records for {ticker}")
+                else:
+                    results[ticker] = True
+                    logger.info(f"No new hourly data to store for {ticker}")
+                    
+            except Exception as e:
+                log_exception(f"Failed to store hourly data for {ticker}", exception=e)
+                results[ticker] = False
+        
+        return results
+
     def _fetch_ticker_data(
             self,
             ticker: str,

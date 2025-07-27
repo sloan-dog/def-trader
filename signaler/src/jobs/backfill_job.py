@@ -157,19 +157,32 @@ class BackfillJob:
         logger.info(f"Running {backfill_type} backfill: {start_date} to {end_date}")
         logger.info(f"Data types: {data_types}, Batch size: {batch_size}")
         
-        # Import here to avoid circular imports
-        from src.jobs.backfill_job import BackfillJob as LegacyBackfillJob
+        # For recent date ranges, use the historical backfill job
+        from src.jobs.historical_backfill_job import HistoricalBackfillJob
         
-        # Create legacy backfill job (reuse existing logic)
-        job = LegacyBackfillJob()
+        # Create a backfill ID for this operation
+        backfill_id = f"{backfill_type}_{start_date}_{end_date}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
-        # Run the backfill
-        results = job.run_backfill(
-            start_date=start_date,
-            end_date=end_date,
+        # Create and run the backfill job
+        job = HistoricalBackfillJob(
+            start_year=start_date.year,
+            end_year=end_date.year,
             data_types=data_types,
-            batch_size=batch_size
+            batch_size=batch_size,
+            backfill_id=backfill_id
         )
+        
+        # Run the backfill (no resume for these short-range backfills)
+        job.run(resume=False)
+        
+        # Get final status
+        status = self.tracker.get_backfill_status(backfill_id)
+        
+        results = {
+            'success': status and status['status'] == 'completed',
+            'backfill_id': backfill_id,
+            'records_processed': status.get('completed_months', 0) if status else 0
+        }
         
         logger.info(f"{backfill_type.capitalize()} backfill results: {results}")
         return results

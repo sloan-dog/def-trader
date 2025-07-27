@@ -15,7 +15,7 @@ COPY pyproject.toml .
 COPY README.md .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -e .[api]
+RUN pip install --no-cache-dir -e .[ingestion]
 
 # Copy source code
 COPY src/ ./src/
