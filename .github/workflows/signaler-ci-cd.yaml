@@ -230,6 +230,8 @@ jobs:
             BUILDKIT_INLINE_CACHE=1
 
       - name: Build and push API image
+        # DISABLED: prediction-api - not ready for model yet
+        if: false
         uses: docker/build-push-action@v5
         with:
           context: ./signaler
@@ -358,7 +360,11 @@ jobs:
             --project=${{ env.GCP_PROJECT_ID }} \
             --region=${{ env.GCP_REGION }} \
             --image=gcr.io/${{ env.GCP_PROJECT_ID }}/backfill-job:${{ github.sha }}
-          
+
+      - name: Deploy Prediction API (Production)
+        # DISABLED: prediction-api - not ready for model yet
+        if: false
+        run: |
           # Deploy API service (keep as service for real-time predictions)
           gcloud run deploy prediction-api \
             --image gcr.io/${{ env.GCP_PROJECT_ID }}/trading-system/api:${{ github.sha }} \
