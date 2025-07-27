@@ -6,9 +6,9 @@ FROM ${BASE_IMAGE} as base
 # Switch to root to install additional dependencies
 USER root
 
-# Install API-specific dependencies
+# Install API-specific dependencies and training dependencies for model inference
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -e .[api]
+    pip install -e .[api,training]
 
 # Switch back to non-root user
 USER appuser
