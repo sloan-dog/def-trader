@@ -36,6 +36,7 @@ class BackfillTracker:
             {"name": "updated_at", "type": "TIMESTAMP", "mode": "REQUIRED"},
             {"name": "completed_at", "type": "TIMESTAMP", "mode": "NULLABLE"},
             {"name": "error_message", "type": "STRING", "mode": "NULLABLE"},
+            {"name": "inserted_at", "type": "TIMESTAMP", "mode": "REQUIRED"},
         ]
         
         # Checkpoint table - tracks individual year-month completions
@@ -48,6 +49,7 @@ class BackfillTracker:
             {"name": "status", "type": "STRING", "mode": "REQUIRED"},  # completed, failed
             {"name": "records_fetched", "type": "INTEGER", "mode": "NULLABLE"},
             {"name": "completed_at", "type": "TIMESTAMP", "mode": "REQUIRED"},
+            {"name": "inserted_at", "type": "TIMESTAMP", "mode": "REQUIRED"},
             {"name": "error_message", "type": "STRING", "mode": "NULLABLE"},
         ]
         
@@ -105,8 +107,8 @@ class BackfillTracker:
             'data_types': data_types,
             'total_months': total_months,
             'completed_months': 0,
-            'started_at': datetime.now(),
-            'updated_at': datetime.now(),
+            'started_at': pd.Timestamp.now(),
+            'updated_at': pd.Timestamp.now(),
             'completed_at': None,
             'error_message': None
         }])

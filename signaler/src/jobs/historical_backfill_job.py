@@ -118,9 +118,9 @@ class HistoricalBackfillJob:
     def _process_ohlcv_month(self, year: int, month: int):
         """Process OHLCV data for a specific month."""
         # Get tickers
-        tickers_df = self.bq_client.query("""
+        tickers_df = self.bq_client.query(f"""
             SELECT DISTINCT symbol 
-            FROM sp500_constituents 
+            FROM {self.bq_client.dataset_id}.sp500_constituents 
             WHERE symbol NOT LIKE '%.%'
             ORDER BY symbol
         """)

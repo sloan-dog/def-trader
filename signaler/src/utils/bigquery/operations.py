@@ -58,7 +58,19 @@ class BigQueryOperations(BigQueryBase):
             # Perform merge operation
             merge_keys_str = ', '.join([f't.{key} = s.{key}' for key in merge_keys])
             update_cols = [col for col in df.columns if col not in merge_keys]
-            update_str = ', '.join([f't.{col} = s.{col}' for col in update_cols])
+            
+            # Check table schema to identify TIMESTAMP columns
+            table = self.client.get_table(table_id)
+            timestamp_cols = {field.name for field in table.schema if field.field_type == 'TIMESTAMP'}
+            
+            # Build update string with TIMESTAMP conversion for timestamp columns
+            update_parts = []
+            for col in update_cols:
+                if col in timestamp_cols:
+                    update_parts.append(f't.{col} = TIMESTAMP(s.{col})')
+                else:
+                    update_parts.append(f't.{col} = s.{col}')
+            update_str = ', '.join(update_parts)
 
             merge_query = f"""
             MERGE `{table_id}` t
@@ -68,7 +80,7 @@ class BigQueryOperations(BigQueryBase):
                 UPDATE SET {update_str}
             WHEN NOT MATCHED THEN
                 INSERT ({', '.join(df.columns)})
-                VALUES ({', '.join([f's.{col}' for col in df.columns])})
+                VALUES ({', '.join([f'TIMESTAMP(s.{col})' if col in timestamp_cols else f's.{col}' for col in df.columns])})
             """
 
             self.client.query(merge_query).result()
