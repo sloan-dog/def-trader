@@ -105,8 +105,8 @@ class BackfillTracker:
             'data_types': data_types,
             'total_months': total_months,
             'completed_months': 0,
-            'started_at': pd.Timestamp.now(),
-            'updated_at': pd.Timestamp.now(),
+            'started_at': datetime.now(),
+            'updated_at': datetime.now(),
             'completed_at': None,
             'error_message': None
         }])
@@ -181,7 +181,7 @@ class BackfillTracker:
             'data_type': data_type,
             'status': 'failed' if error else 'completed',
             'records_fetched': records_fetched if not error else None,
-            'completed_at': pd.Timestamp.now(),
+            'completed_at': datetime.now(),
             'error_message': error
         }])
         
@@ -217,14 +217,14 @@ class BackfillTracker:
             'current_year': next_year if not is_complete else year,
             'current_month': next_month if not is_complete else month,
             'status': 'completed' if is_complete else 'in_progress',
-            'updated_at': pd.Timestamp.now()
+            'updated_at': datetime.now()
         }
         
         if increment_completed:
             updates['completed_months'] = status['completed_months'] + 1
         
         if is_complete:
-            updates['completed_at'] = pd.Timestamp.now()
+            updates['completed_at'] = datetime.now()
         
         # Update the record
         self._update_progress_record(backfill_id, updates)
@@ -300,6 +300,6 @@ class BackfillTracker:
             {
                 'status': 'failed',
                 'error_message': error_message,
-                'updated_at': pd.Timestamp.now()
+                'updated_at': datetime.now()
             }
         )
