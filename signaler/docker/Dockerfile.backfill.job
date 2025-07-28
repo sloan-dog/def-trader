@@ -21,9 +21,13 @@ RUN pip install --no-cache-dir -e .[ingestion]
 COPY src/ ./src/
 COPY config/ ./config/
 
+# Copy entrypoint script
+COPY docker/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
-# Run the backfill job
-ENTRYPOINT ["python", "-m", "src.jobs.backfill_job"] 
+# Run the backfill job using shell script wrapper
+ENTRYPOINT ["/app/entrypoint.sh"] 
