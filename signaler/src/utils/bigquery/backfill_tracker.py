@@ -159,7 +159,7 @@ class BackfillTracker:
         if current_month > 1:
             return (current_year, current_month)
         elif current_year > status['start_year']:
-            return (current_year, 12)
+            return (current_year - 1, 12)
         else:
             # We've reached the start
             return None
