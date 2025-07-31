@@ -144,6 +144,59 @@ resource "google_storage_bucket" "data" {
   }
 }
 
+# Parquet data storage bucket
+resource "google_storage_bucket" "parquet_data" {
+  name     = "${var.project_id}-parquet-data"
+  location = var.region
+  
+  # Enable uniform bucket-level access for better performance
+  uniform_bucket_level_access = true
+  
+  # Storage class for frequently accessed data
+  storage_class = "STANDARD"
+
+  # Lifecycle rules for data management
+  lifecycle_rule {
+    condition {
+      age = 365  # Move to NEARLINE after 1 year
+    }
+    action {
+      type = "SetStorageClass"
+      storage_class = "NEARLINE"
+    }
+  }
+  
+  lifecycle_rule {
+    condition {
+      age = 730  # Move to COLDLINE after 2 years
+    }
+    action {
+      type = "SetStorageClass"
+      storage_class = "COLDLINE"
+    }
+  }
+
+  # Versioning for data safety
+  versioning {
+    enabled = true
+  }
+  
+  # CORS configuration for potential web access
+  cors {
+    origin          = ["*"]
+    method          = ["GET", "HEAD", "PUT", "POST", "DELETE"]
+    response_header = ["*"]
+    max_age_seconds = 3600
+  }
+  
+  # Labels for organization
+  labels = {
+    environment = var.environment
+    purpose     = "time-series-data"
+    format      = "parquet"
+  }
+}
+
 # Secret Manager for API keys
 resource "google_secret_manager_secret" "alpha_vantage_key" {
   secret_id = "alpha-vantage-api-key"
@@ -177,6 +230,7 @@ module "cloud_run" {
       env_vars = {
         GCP_PROJECT_ID = var.project_id
         BQ_DATASET     = var.bigquery_dataset
+        GCS_BUCKET     = google_storage_bucket.parquet_data.name
       }
     }
 
@@ -203,6 +257,7 @@ module "cloud_run_jobs" {
       env_vars = {
         GCP_PROJECT_ID = var.project_id
         BQ_DATASET     = var.bigquery_dataset
+        GCS_BUCKET     = google_storage_bucket.parquet_data.name
       }
       timeout = "7200s"  # 2 hours for ingestion job
     }
@@ -217,8 +272,24 @@ module "cloud_run_jobs" {
       env_vars = {
         GCP_PROJECT_ID = var.project_id
         BQ_DATASET     = var.bigquery_dataset
+        GCS_BUCKET     = google_storage_bucket.parquet_data.name
       }
       timeout = "7200s"  # 2 hours for backfill job
+    }
+
+    ohlcv_parquet = {
+      name   = "ohlcv-parquet-ingestion-job"
+      # Use Google's hello world image as placeholder
+      # CI/CD will update this, and Terraform will ignore changes
+      image  = "us-docker.pkg.dev/cloudrun/container/hello"
+      cpu    = "4"
+      memory = "8Gi"
+      env_vars = {
+        GCP_PROJECT_ID       = var.project_id
+        GCS_BUCKET          = google_storage_bucket.parquet_data.name
+        ALPHA_VANTAGE_API_KEY = google_secret_manager_secret_version.alpha_vantage_key.secret_data
+      }
+      timeout = "7200s"  # 2 hours for backfill operations
     }
   }
 }
@@ -273,6 +344,29 @@ module "cloud_scheduler" {
       headers = {
         "Content-Type" = "application/json"
       }
+    }
+
+    hourly_ohlcv_parquet = {
+      name        = "hourly-ohlcv-parquet-update"
+      schedule    = "0 * * * *"  # Every hour
+      timezone    = "America/New_York"
+      # Use Cloud Run Job execution URL for OHLCV Parquet job
+      target_url  = try("https://${var.region}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${var.project_id}/jobs/${module.cloud_run_jobs.job_names["ohlcv_parquet"]}/executions", "https://placeholder-url")
+      description = "Hourly OHLCV data update to Parquet/GCS"
+      retry_count = 3
+      max_retry_duration = "1800s"
+      http_method = "POST"
+      headers = {
+        "Content-Type" = "application/json"
+      }
+      # Pass args for update mode with 2 hour lookback
+      body = jsonencode({
+        overrides = {
+          containerOverrides = [{
+            args = ["update", "--lookback", "2"]
+          }]
+        }
+      })
     }
   }
 }
@@ -332,4 +426,9 @@ output "metadata_store_name" {
 
 output "tensorboard_name" {
   value = module.vertex_ai.tensorboard_name
+}
+
+output "parquet_data_bucket" {
+  value       = google_storage_bucket.parquet_data.name
+  description = "GCS bucket for Parquet time-series data"
 }

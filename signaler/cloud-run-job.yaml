@@ -24,6 +24,8 @@ spec:
               value: "trading-signals-420-69"
             - name: BQ_DATASET
               value: "trading_signals"
+            - name: GCS_BUCKET
+              value: "trading-signals-420-69-parquet-data"
             - name: ALPHA_VANTAGE_API_KEY
               valueFrom:
                 secretKeyRef:

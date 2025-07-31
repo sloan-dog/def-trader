@@ -329,7 +329,6 @@ class AlphaVantageClient:
                 if 'feed' in data:
                     for article in data['feed']:
                         sentiment_data = {
-                            'ticker': ticker,
                             'time_published': pd.to_datetime(article.get('time_published')),
                             'title': article.get('title'),
                             'overall_sentiment_score': float(article.get('overall_sentiment_score', 0)),
@@ -337,6 +336,7 @@ class AlphaVantageClient:
                         }
 
                         # Get ticker-specific sentiment
+                        ticker_found = False
                         for ticker_sentiment in article.get('ticker_sentiment', []):
                             if ticker_sentiment.get('ticker') == ticker:
                                 sentiment_data['ticker_sentiment_score'] = float(
@@ -345,8 +345,12 @@ class AlphaVantageClient:
                                 sentiment_data['ticker_sentiment_label'] = ticker_sentiment.get(
                                     'ticker_sentiment_label'
                                 )
-
-                        results.append(sentiment_data)
+                                ticker_found = True
+                                break
+                        
+                        # Only include articles that mention this specific ticker
+                        if ticker_found or any(ticker in article.get('title', '') for ticker in [ticker]):
+                            results.append(sentiment_data)
 
             except Exception as e:
                 logger.error(f"Failed to fetch sentiment for {ticker}: {e}")

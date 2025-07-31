@@ -229,6 +229,24 @@ jobs:
           build-args: |
             BUILDKIT_INLINE_CACHE=1
 
+      - name: Build and push OHLCV Parquet job image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./signaler
+          file: ./signaler/docker/Dockerfile.ohlcv.parquet.job
+          push: true
+          tags: |
+            gcr.io/${{ env.GCP_PROJECT_ID }}/ohlcv-parquet-job:latest
+            gcr.io/${{ env.GCP_PROJECT_ID }}/ohlcv-parquet-job:${{ github.sha }}
+          cache-from: |
+            type=gha
+            type=registry,ref=gcr.io/${{ env.GCP_PROJECT_ID }}/ohlcv-parquet-job:buildcache
+          cache-to: |
+            type=gha,mode=max
+            type=registry,ref=gcr.io/${{ env.GCP_PROJECT_ID }}/ohlcv-parquet-job:buildcache,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+
       - name: Build and push API image
         # DISABLED: prediction-api - not ready for model yet
         if: false
@@ -278,6 +296,7 @@ jobs:
           # Copy files only if they don't already exist in current directory
           [ -f ./cloud-run-job.yaml ] || cp cloud-run-job.yaml ./
           [ -f ./cloud-run-backfill-job.yaml ] || cp cloud-run-backfill-job.yaml ./
+          [ -f ./cloud-run-ohlcv-parquet-job.yaml ] || cp cloud-run-ohlcv-parquet-job.yaml ./
 
       - name: Deploy Cloud Run Jobs (Staging)
         run: |
@@ -302,6 +321,17 @@ jobs:
             --project=${{ env.GCP_PROJECT_ID }} \
             --region=${{ env.GCP_REGION }} \
             --image=gcr.io/${{ env.GCP_PROJECT_ID }}/backfill-job:${{ github.sha }}
+          
+          # Deploy OHLCV Parquet job (staging)
+          gcloud run jobs replace cloud-run-ohlcv-parquet-job.yaml \
+            --project=${{ env.GCP_PROJECT_ID }} \
+            --region=${{ env.GCP_REGION }}
+          
+          # Update OHLCV Parquet job with new image
+          gcloud run jobs update ohlcv-parquet-ingestion-job \
+            --project=${{ env.GCP_PROJECT_ID }} \
+            --region=${{ env.GCP_REGION }} \
+            --image=gcr.io/${{ env.GCP_PROJECT_ID }}/ohlcv-parquet-job:${{ github.sha }}
 
       - name: Run smoke tests
         run: |
@@ -336,6 +366,7 @@ jobs:
           # Copy files only if they don't already exist in current directory
           [ -f ./cloud-run-job.yaml ] || cp cloud-run-job.yaml ./
           [ -f ./cloud-run-backfill-job.yaml ] || cp cloud-run-backfill-job.yaml ./
+          [ -f ./cloud-run-ohlcv-parquet-job.yaml ] || cp cloud-run-ohlcv-parquet-job.yaml ./
 
       - name: Deploy Cloud Run Jobs (Production)
         run: |
@@ -360,6 +391,17 @@ jobs:
             --project=${{ env.GCP_PROJECT_ID }} \
             --region=${{ env.GCP_REGION }} \
             --image=gcr.io/${{ env.GCP_PROJECT_ID }}/backfill-job:${{ github.sha }}
+          
+          # Deploy OHLCV Parquet job (production)
+          gcloud run jobs replace cloud-run-ohlcv-parquet-job.yaml \
+            --project=${{ env.GCP_PROJECT_ID }} \
+            --region=${{ env.GCP_REGION }}
+          
+          # Update OHLCV Parquet job with new image
+          gcloud run jobs update ohlcv-parquet-ingestion-job \
+            --project=${{ env.GCP_PROJECT_ID }} \
+            --region=${{ env.GCP_REGION }} \
+            --image=gcr.io/${{ env.GCP_PROJECT_ID }}/ohlcv-parquet-job:${{ github.sha }}
 
       - name: Deploy Prediction API (Production)
         # DISABLED: prediction-api - not ready for model yet

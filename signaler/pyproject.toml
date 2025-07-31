@@ -165,6 +165,7 @@ trading-backfill = "src.jobs.backfill_job:main"
 trading-train = "src.jobs.training_job:main"
 trading-predict = "src.training.prediction_pipeline:main"
 trading-ohlcv = "src.jobs.ohlcv_ingestion_job:cli"
+trading-sentiment = "src.jobs.sentiment_ingestion_job:cli"
 
 [project.urls]
 Homepage = "https://github.com/yourorg/trading-signal-system"

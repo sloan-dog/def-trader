@@ -1,7 +1,7 @@
 apiVersion: run.googleapis.com/v1
 kind: Job
 metadata:
-  name: backfill-job
+  name: ohlcv-parquet-ingestion-job
   annotations:
     run.googleapis.com/ingress: all
 spec:
@@ -18,13 +18,9 @@ spec:
           timeoutSeconds: 7200  # 2 hours
           maxRetries: 3
           containers:
-          - image: gcr.io/trading-signals-420-69/backfill-job:latest
+          - image: gcr.io/trading-signals-420-69/ohlcv-parquet-job:latest
             env:
             - name: GCP_PROJECT_ID
-              value: "trading-signals-420-69"
-            - name: BQ_DATASET
-              value: "trading_signals"
-            - name: GOOGLE_CLOUD_PROJECT
               value: "trading-signals-420-69"
             - name: GCS_BUCKET
               value: "trading-signals-420-69-parquet-data"
@@ -36,4 +32,7 @@ spec:
             resources:
               limits:
                 cpu: "4"
-                memory: "8Gi" 
+                memory: "8Gi"
+            # Default command is to show help
+            # Scheduler will override with specific commands
+            args: ["--help"]
