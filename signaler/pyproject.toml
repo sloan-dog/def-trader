@@ -67,6 +67,8 @@ ingestion = [
     "pyarrow>=12.0.0,<16.0.0",
     "pandas-gbq>=0.19.0,<1.0.0",
     "flask>=3.0.0,<4.0.0",
+    "gcsfs>=2023.12.0",  # For GCS filesystem access
+    "duckdb>=0.9.0",  # For querying Parquet files
 ]
 
 # ML Training Service dependencies
@@ -101,6 +103,8 @@ all = [
     "google-cloud-bigquery-storage>=2.22.0,<3.0.0",
     "pyarrow>=12.0.0,<16.0.0",
     "pandas-gbq>=0.19.0,<1.0.0",
+    "gcsfs>=2023.12.0",
+    "duckdb>=0.9.0",
     
     # Training dependencies
     "torch>=2.1.0,<3.0.0",
@@ -160,6 +164,7 @@ trading-daily-ingestion = "src.jobs.daily_ingestion:main"
 trading-backfill = "src.jobs.backfill_job:main"
 trading-train = "src.jobs.training_job:main"
 trading-predict = "src.training.prediction_pipeline:main"
+trading-ohlcv = "src.jobs.ohlcv_ingestion_job:cli"
 
 [project.urls]
 Homepage = "https://github.com/yourorg/trading-signal-system"
