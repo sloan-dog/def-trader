@@ -9,8 +9,7 @@ from datetime import datetime, timedelta
 import joblib
 import json
 from pathlib import Path
-from loguru import logger
-
+from src.utils import logger
 from config.settings import BQ_TABLES, MODEL_CONFIG
 from src.models.temporal_gnn import TemporalGNN, StockGraphDataset
 from src.feature_engineering.graph_constructor import StockGraphConstructor
@@ -204,7 +203,7 @@ class PredictionPipeline:
                 predictions = self.generate_predictions(date_str, tickers)
                 all_predictions.append(predictions)
             except Exception as e:
-                logger.error(f"Failed to generate predictions for {date_str}: {e}")
+                logger.error("Failed to generate predictions for {date_str}")
 
         if all_predictions:
             return pd.concat(all_predictions, ignore_index=True)
@@ -231,7 +230,7 @@ class PredictionPipeline:
             logger.info(f"Stored {len(predictions_df)} predictions")
             return True
         except Exception as e:
-            logger.error(f"Failed to store predictions: {e}")
+            logger.error("Failed to store predictions")
             return False
 
     def evaluate_historical_predictions(
@@ -432,5 +431,5 @@ class RealTimePredictionService:
                 time.sleep(update_interval)
 
             except Exception as e:
-                logger.error(f"Error in prediction stream: {e}")
+                logger.error("Error in prediction stream")
                 time.sleep(60)  # Wait before retry

@@ -1,4 +1,4 @@
 """Utils module."""
-from .logging_config import setup_logging, log_exception
+from .logger import logger, setup_module_logging
 
-__all__ = ["setup_logging", "log_exception"]
+__all__ = ["logger", "setup_module_logging"]

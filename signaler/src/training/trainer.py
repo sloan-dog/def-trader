@@ -10,7 +10,7 @@ from typing import Dict, List, Tuple, Optional
 from datetime import datetime, timedelta
 import json
 from pathlib import Path
-from loguru import logger
+from src.utils import logger
 import mlflow
 from sklearn.preprocessing import RobustScaler
 from google.cloud import aiplatform

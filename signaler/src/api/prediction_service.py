@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Optional
 from datetime import datetime, date
 import pandas as pd
-from loguru import logger
+from src.utils import logger
 import os
 import numpy as np  # Add this line
 
@@ -160,7 +160,7 @@ async def generate_predictions(request: PredictionRequest):
         return responses
 
     except Exception as e:
-        logger.error(f"Prediction error: {e}")
+        logger.error("Prediction error")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -206,7 +206,7 @@ async def generate_signals(request: SignalRequest):
         return responses
 
     except Exception as e:
-        logger.error(f"Signal generation error: {e}")
+        logger.error("Signal generation error")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -251,7 +251,7 @@ async def create_portfolio(request: PortfolioRequest):
         return allocations
 
     except Exception as e:
-        logger.error(f"Portfolio creation error: {e}")
+        logger.error("Portfolio creation error")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -316,7 +316,7 @@ async def get_performance_metrics(
         )
 
     except Exception as e:
-        logger.error(f"Performance metrics error: {e}")
+        logger.error("Performance metrics error")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -335,7 +335,7 @@ async def get_available_tickers():
         return result.to_dict('records')
 
     except Exception as e:
-        logger.error(f"Error fetching tickers: {e}")
+        logger.error("Error fetching tickers")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -372,7 +372,7 @@ async def get_prediction_history(
         return result.to_dict('records')
 
     except Exception as e:
-        logger.error(f"Error fetching prediction history: {e}")
+        logger.error("Error fetching prediction history")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -401,7 +401,7 @@ async def run_backtest(
         }
 
     except Exception as e:
-        logger.error(f"Backtest error: {e}")
+        logger.error("Backtest error")
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, List, Tuple, Optional
 from sklearn.preprocessing import StandardScaler
-from loguru import logger
+from src.utils import logger
 import networkx as nx
 import json
 

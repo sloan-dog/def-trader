@@ -4,9 +4,7 @@ Data validation utilities for ensuring data quality.
 import pandas as pd
 import numpy as np
 from typing import Tuple, List, Dict, Any
-from loguru import logger
-
-
+from src.utils import logger
 class DataValidator:
     """Validate financial data for quality and consistency."""
 

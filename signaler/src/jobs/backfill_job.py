@@ -7,8 +7,7 @@ import click
 import sys
 from datetime import datetime, timedelta
 from typing import List, Optional
-from loguru import logger
-
+from src.utils import logger
 from src.shared_logging import setup_logging, log_exception
 from src.jobs.historical_backfill_job import HistoricalBackfillJob
 from src.utils.bigquery.client import BigQueryClient

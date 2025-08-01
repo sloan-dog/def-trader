@@ -4,7 +4,7 @@ Model training job for scheduled training runs.
 import click
 import sys
 from datetime import datetime, timedelta
-from loguru import logger
+from src.utils import logger
 import mlflow
 import json
 
@@ -106,7 +106,7 @@ class TrainingJob:
             results['success'] = True
 
         except Exception as e:
-            logger.error(f"Training job failed: {e}")
+            logger.error("Training job failed")
             results['success'] = False
             results['error'] = str(e)
 
@@ -294,7 +294,7 @@ class TrainingJob:
             return True
 
         except Exception as e:
-            logger.error(f"Model deployment failed: {e}")
+            logger.error("Model deployment failed")
             return False
 
     def _log_job_results(self, results: Dict):
@@ -323,7 +323,7 @@ class TrainingJob:
             )
 
         except Exception as e:
-            logger.error(f"Failed to log job results: {e}")
+            logger.error("Failed to log job results")
 
 
 @click.command()

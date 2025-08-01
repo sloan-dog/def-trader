@@ -3,8 +3,7 @@ Administrative BigQuery operations for dataset and table management.
 """
 from typing import Dict, List, Optional
 from google.cloud import bigquery
-from loguru import logger
-
+from src.utils import logger
 from .base import BigQueryBase
 from .schemas import (
     get_table_schemas,

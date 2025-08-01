@@ -4,8 +4,7 @@ Core BigQuery operations for data manipulation.
 from typing import List, Optional, Dict, Any
 import pandas as pd
 from google.cloud import bigquery
-from loguru import logger
-
+from src.utils import logger
 from config.settings import BQ_TABLES, INGESTION_CONFIG
 from .base import BigQueryBase
 from .utils import retry_on_error

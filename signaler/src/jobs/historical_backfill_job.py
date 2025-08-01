@@ -9,8 +9,7 @@ import argparse
 from datetime import datetime
 from typing import List, Optional
 import pandas as pd
-from loguru import logger
-
+from src.utils import logger
 from src.shared_logging import setup_logging
 from src.utils.bigquery.client import BigQueryClient
 from src.utils.bigquery.backfill_tracker import BackfillTracker

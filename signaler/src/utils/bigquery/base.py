@@ -3,8 +3,7 @@ Base BigQuery client with core functionality.
 """
 from typing import Optional
 from google.cloud import bigquery
-from loguru import logger
-
+from src.utils import logger
 from config.settings import GCP_PROJECT_ID, BQ_DATASET, BQ_LOCATION
 
 

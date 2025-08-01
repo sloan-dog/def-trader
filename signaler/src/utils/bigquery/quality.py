@@ -2,8 +2,7 @@
 BigQuery data quality and validation operations.
 """
 from typing import Dict, Any, List, Optional, Tuple
-from loguru import logger
-
+from src.utils import logger
 from config.settings import BQ_TABLES
 from .operations import BigQueryOperations
 

@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Union
 import pandas as pd
 import requests
 from datetime import datetime, timedelta
-from loguru import logger
+from src.utils import logger
 import asyncio
 import aiohttp
 from functools import lru_cache
@@ -76,7 +76,7 @@ class AlphaVantageClient:
             return data
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"Request failed for params {params}: {e}")
+            logger.error("Request failed for params {params}")
             raise
 
     def get_daily_ohlcv(
@@ -353,7 +353,7 @@ class AlphaVantageClient:
                             results.append(sentiment_data)
 
             except Exception as e:
-                logger.error(f"Failed to fetch sentiment for {ticker}: {e}")
+                logger.error("Failed to fetch sentiment for {ticker}")
 
         return pd.DataFrame(results) if results else pd.DataFrame()
 
@@ -409,5 +409,5 @@ class AlphaVantageClient:
             data = self._make_request(params)
             return 'Global Quote' in data
         except Exception as e:
-            logger.error(f"API key validation failed: {e}")
+            logger.error("API key validation failed")
             return False

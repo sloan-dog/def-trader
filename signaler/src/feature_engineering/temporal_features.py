@@ -6,8 +6,7 @@ import numpy as np
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 import holidays
-from loguru import logger
-
+from src.utils import logger
 from config.settings import BQ_TABLES
 from src.utils.bigquery import BigQueryClient
 
@@ -346,7 +345,7 @@ class TemporalFeatureEngineer:
             return True
 
         except Exception as e:
-            logger.error(f"Failed to store temporal features: {e}")
+            logger.error("Failed to store temporal features")
             return False
 
     def get_feature_importance(self) -> pd.DataFrame:

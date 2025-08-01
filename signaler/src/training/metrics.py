@@ -6,9 +6,7 @@ import pandas as pd
 from typing import Dict, List, Tuple, Optional
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from scipy import stats
-from loguru import logger
-
-
+from src.utils import logger
 class ModelMetrics:
     """Calculate comprehensive metrics for model evaluation."""
 

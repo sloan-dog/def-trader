@@ -8,8 +8,7 @@ import time
 import atexit
 from datetime import datetime
 from flask import Flask, jsonify, request
-from loguru import logger
-
+from src.utils import logger
 from src.shared_logging import setup_logging, log_exception
 from src.jobs.daily_ingestion import DailyIngestionJob
 

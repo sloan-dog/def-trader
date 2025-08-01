@@ -5,8 +5,7 @@ import time
 from functools import wraps
 from typing import Callable, TypeVar, Any
 from google.cloud.exceptions import GoogleCloudError
-from loguru import logger
-
+from src.utils import logger
 T = TypeVar('T')
 
 
@@ -29,7 +28,7 @@ def retry_on_error(max_retries: int = 3, delay: int = 5) -> Callable[[Callable[.
                     return func(*args, **kwargs)
                 except GoogleCloudError as e:
                     if attempt == max_retries - 1:
-                        logger.error(f"Failed after {max_retries} attempts: {e}")
+                        logger.error("Failed after {max_retries} attempts")
                         raise
                     logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying...")
                     time.sleep(delay * (attempt + 1))

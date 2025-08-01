@@ -4,7 +4,7 @@ Sentiment data fetcher that writes to Parquet/GCS.
 import pandas as pd
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
-from loguru import logger
+from src.utils import logger
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -93,7 +93,7 @@ class SentimentParquetFetcher:
                         logger.info(f"Fetched {len(sentiment_df)} articles for {symbol}")
                     
                 except Exception as e:
-                    logger.error(f"Failed to fetch sentiment for {symbol}: {e}")
+                    logger.error("Failed to fetch sentiment for {symbol}")
                     results['symbols_failed'].append(symbol)
             
             # Rate limiting between batches
@@ -186,7 +186,7 @@ class SentimentParquetFetcher:
                 time.sleep(12)
                 
             except Exception as e:
-                logger.error(f"Failed to update sentiment for {symbol}: {e}")
+                logger.error("Failed to update sentiment for {symbol}")
         
         results['end_time'] = datetime.now()
         results['duration'] = (results['end_time'] - results['start_time']).total_seconds()
@@ -305,7 +305,7 @@ class SentimentParquetFetcher:
             return daily_sentiment
             
         except Exception as e:
-            logger.error(f"Failed to aggregate sentiment: {e}")
+            logger.error("Failed to aggregate sentiment")
             return pd.DataFrame()
     
     def get_sentiment_summary(self) -> pd.DataFrame:
@@ -348,7 +348,7 @@ class SentimentParquetFetcher:
             return summary
             
         except Exception as e:
-            logger.error(f"Failed to get sentiment summary: {e}")
+            logger.error("Failed to get sentiment summary")
             return pd.DataFrame()
     
     def _get_all_symbols(self) -> List[str]:

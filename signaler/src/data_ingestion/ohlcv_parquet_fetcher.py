@@ -4,7 +4,7 @@ OHLCV data fetcher that writes to Parquet/GCS.
 import pandas as pd
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
-from loguru import logger
+from src.utils import logger
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -86,6 +86,8 @@ class OHLCVParquetFetcher:
                     logger.warning(f"No data returned for {symbol}")
                     results['symbols_failed'].append(symbol)
                     continue
+
+                logger.info(f"Fetched dataframe for {symbol}, {df.head()}")
                 
                 # Filter date range
                 df = self._filter_date_range(df, start_date, end_date)
@@ -96,6 +98,8 @@ class OHLCVParquetFetcher:
                 
                 # Prepare for storage
                 df = self._prepare_dataframe(df, symbol, interval)
+
+                logger.info(f"Prepared dataframe for {symbol}, {df.head()}")
                 
                 # Store to GCS
                 write_result = self.storage_client.write_dataframe(
@@ -114,7 +118,7 @@ class OHLCVParquetFetcher:
                 time.sleep(12)  # Alpha Vantage free tier: 5 calls/min
                 
             except Exception as e:
-                logger.error(f"Failed to process {symbol}: {e}")
+                logger.error(f"Failed to process {symbol}")
                 results['symbols_failed'].append(symbol)
         
         results['end_time'] = datetime.now()
@@ -194,7 +198,7 @@ class OHLCVParquetFetcher:
                 time.sleep(12)
                 
             except Exception as e:
-                logger.error(f"Failed to update {symbol}: {e}")
+                logger.error(f"Failed to update {symbol}")
         
         results['end_time'] = datetime.now()
         results['duration'] = (results['end_time'] - results['start_time']).total_seconds()
@@ -251,7 +255,7 @@ class OHLCVParquetFetcher:
                     else:
                         results['failed'].append(symbol)
                 except Exception as e:
-                    logger.error(f"Failed to fetch {symbol}: {e}")
+                    logger.error(f"Failed to fetch {symbol}")
                     results['failed'].append(symbol)
             
             # Write batch in parallel
@@ -282,15 +286,18 @@ class OHLCVParquetFetcher:
     ) -> Optional[pd.DataFrame]:
         """Fetch data from Alpha Vantage."""
         try:
+            # For hourly data (60min), always use intraday endpoint
+            # Only use daily endpoint if explicitly requesting daily bars
             if interval == 'daily':
-                df = self.av_client.get_daily_adjusted(symbol, outputsize)
+                df = self.av_client.get_daily_ohlcv(symbol, outputsize)
             else:
-                df = self.av_client.get_intraday(symbol, interval, outputsize)
+                # This handles 1min, 5min, 15min, 30min, 60min
+                df = self.av_client.get_intraday_data(symbol, interval, outputsize)
             
             return df
             
         except Exception as e:
-            logger.error(f"Error fetching {symbol}: {e}")
+            logger.error(f"Error fetching {symbol}")
             return None
     
     def _prepare_dataframe(
@@ -300,13 +307,18 @@ class OHLCVParquetFetcher:
         interval: str
     ) -> pd.DataFrame:
         """Prepare DataFrame for storage with proper schema."""
+        # Debug: log the columns we received
+        logger.debug(f"DataFrame columns for {symbol}: {df.columns.tolist()}")
+        logger.debug(f"DataFrame index name: {df.index.name}")
+        
         # Ensure we have timestamp column
-        if 'timestamp' not in df.columns and df.index.name in ['date', 'timestamp']:
+        if 'timestamp' not in df.columns and df.index.name in ['date', 'timestamp', 'datetime']:
             df = df.reset_index()
         
         # Rename columns to standard names
         column_mapping = {
             'date': 'timestamp',
+            'datetime': 'timestamp',  # For intraday data
             '1. open': 'open',
             '2. high': 'high', 
             '3. low': 'low',
@@ -355,8 +367,10 @@ class OHLCVParquetFetcher:
         end_date: str
     ) -> pd.DataFrame:
         """Filter DataFrame to date range."""
-        df['timestamp'] = pd.to_datetime(df['timestamp'])
-        mask = (df['timestamp'] >= start_date) & (df['timestamp'] <= end_date)
+        # Check which date column exists
+        date_col = 'timestamp' if 'timestamp' in df.columns else 'datetime'
+        df[date_col] = pd.to_datetime(df[date_col])
+        mask = (df[date_col] >= start_date) & (df[date_col] <= end_date)
         return df[mask].copy()
     
     def _get_latest_timestamp(
@@ -419,5 +433,5 @@ class OHLCVParquetFetcher:
             return summary
             
         except Exception as e:
-            logger.error(f"Failed to get data summary: {e}")
+            logger.error(f"Failed to get data summary")
             return pd.DataFrame()

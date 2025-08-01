@@ -287,7 +287,6 @@ module "cloud_run_jobs" {
       env_vars = {
         GCP_PROJECT_ID       = var.project_id
         GCS_BUCKET          = google_storage_bucket.parquet_data.name
-        ALPHA_VANTAGE_API_KEY = google_secret_manager_secret_version.alpha_vantage_key.secret_data
       }
       timeout = "7200s"  # 2 hours for backfill operations
     }

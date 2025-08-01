@@ -5,7 +5,7 @@ import click
 import sys
 from datetime import datetime, timedelta
 from typing import Dict
-from loguru import logger
+from src.utils import logger
 import traceback
 
 from src.shared_logging import setup_logging, log_exception
@@ -200,7 +200,7 @@ class DailyIngestionJob:
         try:
             return self.macro_updater.run_full_update()
         except Exception as e:
-            logger.error(f"Macro data update failed: {e}")
+            logger.error("Macro data update failed")
             return False
 
     def _update_sentiment_data(self, date: str) -> bool:
@@ -246,7 +246,7 @@ class DailyIngestionJob:
             return False
 
         except Exception as e:
-            logger.error(f"Sentiment update failed: {e}")
+            logger.error("Sentiment update failed")
             return False
 
     def _generate_temporal_features(self, date: str) -> bool:
@@ -260,7 +260,7 @@ class DailyIngestionJob:
             return self.temporal_engineer.store_temporal_features(date, end_date)
 
         except Exception as e:
-            logger.error(f"Temporal feature generation failed: {e}")
+            logger.error("Temporal feature generation failed")
             return False
 
     def _update_feature_view(self) -> bool:
@@ -269,7 +269,7 @@ class DailyIngestionJob:
             self.bq_client.create_feature_view()
             return True
         except Exception as e:
-            logger.error(f"Feature view update failed: {e}")
+            logger.error("Feature view update failed")
             return False
 
     def _run_quality_checks(self, date: str) -> Dict:
@@ -334,7 +334,7 @@ class DailyIngestionJob:
                 quality_results['checks_passed'] += 1
 
         except Exception as e:
-            logger.error(f"Quality checks failed: {e}")
+            logger.error("Quality checks failed")
             quality_results['error'] = str(e)
 
         quality_results['success'] = quality_results['checks_failed'] == 0
@@ -366,7 +366,7 @@ class DailyIngestionJob:
             )
 
         except Exception as e:
-            logger.error(f"Failed to log job results: {e}")
+            logger.error("Failed to log job results")
 
 
 @click.command()

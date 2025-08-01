@@ -9,8 +9,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
-from loguru import logger
-
+from src.utils import logger
 from src.jobs.backfill_job import BackfillJob
 from src.jobs.historical_backfill_job import HistoricalBackfillJob
 from src.shared_logging import setup_logging

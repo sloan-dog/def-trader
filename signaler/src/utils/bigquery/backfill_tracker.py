@@ -5,8 +5,7 @@ BigQuery-based progress tracking for historical backfills.
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple
 import pandas as pd
-from loguru import logger
-
+from src.utils import logger
 from src.utils.bigquery.client import BigQueryClient
 
 

@@ -5,7 +5,7 @@ import click
 import sys
 import time
 from datetime import datetime, timedelta
-from loguru import logger
+from src.utils import logger
 from typing import Optional, List
 
 from src.data_ingestion.sentiment_parquet_fetcher import SentimentParquetFetcher
@@ -66,7 +66,7 @@ class SentimentIngestionJob:
             return results['symbols_processed'] > 0
             
         except Exception as e:
-            logger.error(f"Sentiment fetch failed: {e}")
+            logger.error("Sentiment fetch failed")
             return False
     
     def run_daily_update(
@@ -101,7 +101,7 @@ class SentimentIngestionJob:
             return results['symbols_updated'] > 0
             
         except Exception as e:
-            logger.error(f"Daily update failed: {e}")
+            logger.error("Daily update failed")
             return False
     
     def run_sector_update(
@@ -253,7 +253,7 @@ class SentimentIngestionJob:
                 logger.info(f"Report saved to {output_file}")
             
         except Exception as e:
-            logger.error(f"Failed to generate report: {e}")
+            logger.error("Failed to generate report")
     
     def show_data_summary(self):
         """Display summary of stored sentiment data."""
@@ -284,7 +284,7 @@ class SentimentIngestionJob:
             """)
             
         except Exception as e:
-            logger.error(f"Failed to get summary: {e}")
+            logger.error("Failed to get summary")
 
 
 @click.group()
@@ -385,7 +385,7 @@ def continuous(interval, bucket):
             logger.info("Continuous updates stopped by user")
             break
         except Exception as e:
-            logger.error(f"Error in continuous update: {e}")
+            logger.error("Error in continuous update")
             logger.info("Waiting 30 minutes before retry...")
             time.sleep(1800)
 

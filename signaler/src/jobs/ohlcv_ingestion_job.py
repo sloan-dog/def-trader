@@ -5,7 +5,7 @@ import click
 import sys
 import time
 from datetime import datetime, timedelta
-from loguru import logger
+from src.utils import logger
 from typing import Optional, List
 
 from src.data_ingestion.ohlcv_parquet_fetcher import OHLCVParquetFetcher
@@ -20,14 +20,6 @@ class OHLCVIngestionJob:
         """Initialize the ingestion job."""
         self.fetcher = OHLCVParquetFetcher(bucket_name=bucket_name)
         self.stocks_config = load_stocks_config()
-        
-        # Set up logging
-        logger.add(
-            "logs/ohlcv_ingestion_{time}.log",
-            rotation="1 day",
-            retention="7 days",
-            level="INFO"
-        )
     
     def run_historical_backfill(
         self,
@@ -73,7 +65,7 @@ class OHLCVIngestionJob:
             return results['symbols_processed'] > 0
             
         except Exception as e:
-            logger.error(f"Historical backfill failed: {e}")
+            logger.error("Historical backfill failed")
             return False
     
     def run_daily_update(
@@ -113,7 +105,7 @@ class OHLCVIngestionJob:
             return results['symbols_updated'] > 0
             
         except Exception as e:
-            logger.error(f"Daily update failed: {e}")
+            logger.error("Daily update failed")
             return False
     
     def run_batch_update(
@@ -163,7 +155,7 @@ class OHLCVIngestionJob:
             return results['success'] > 0
             
         except Exception as e:
-            logger.error(f"Batch update failed: {e}")
+            logger.error("Batch update failed")
             return False
     
     def show_data_summary(self, interval: str = '60min'):
@@ -194,7 +186,7 @@ class OHLCVIngestionJob:
             """)
             
         except Exception as e:
-            logger.error(f"Failed to get summary: {e}")
+            logger.error("Failed to get summary")
 
 
 @click.group()
@@ -299,7 +291,7 @@ def continuous(interval, bucket):
             logger.info("Continuous updates stopped by user")
             break
         except Exception as e:
-            logger.error(f"Error in continuous update: {e}")
+            logger.error("Error in continuous update")
             logger.info("Waiting 5 minutes before retry...")
             time.sleep(300)
 

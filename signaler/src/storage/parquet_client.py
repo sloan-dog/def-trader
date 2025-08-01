@@ -10,7 +10,7 @@ from typing import List, Dict, Optional, Union, Any
 from pathlib import Path
 from datetime import datetime
 import json
-from loguru import logger
+from src.utils import logger
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 
@@ -98,7 +98,7 @@ class ParquetStorageClient:
             return metadata
             
         except Exception as e:
-            logger.error(f"Failed to write to {full_path}: {e}")
+            logger.error("Failed to write to {full_path}")
             raise
     
     def read_dataframe(
@@ -147,7 +147,7 @@ class ParquetStorageClient:
             return df
             
         except Exception as e:
-            logger.error(f"Failed to read from {full_path}: {e}")
+            logger.error("Failed to read from {full_path}")
             raise
     
     def append_dataframe(
@@ -241,7 +241,7 @@ class ParquetStorageClient:
             return sorted(list(set(partitions)))
             
         except Exception as e:
-            logger.error(f"Failed to list partitions at {full_path}: {e}")
+            logger.error("Failed to list partitions at {full_path}")
             return []
     
     def delete_partition(
@@ -276,7 +276,7 @@ class ParquetStorageClient:
             return True
             
         except Exception as e:
-            logger.error(f"Failed to delete partition {partition_path}: {e}")
+            logger.error("Failed to delete partition {partition_path}")
             return False
     
     def get_dataset_info(self, path: str) -> Dict[str, Any]:
@@ -323,7 +323,7 @@ class ParquetStorageClient:
             return info
             
         except Exception as e:
-            logger.error(f"Failed to get dataset info for {full_path}: {e}")
+            logger.error("Failed to get dataset info for {full_path}")
             raise
     
     def read_latest_partition(
@@ -400,7 +400,7 @@ class ParquetStorageClient:
                     result = future.result()
                     results[suffix] = result
                 except Exception as e:
-                    logger.error(f"Failed to write {suffix}: {e}")
+                    logger.error("Failed to write {suffix}")
                     results[suffix] = {'error': str(e)}
         
         return results
@@ -430,5 +430,5 @@ class ParquetStorageClient:
             return hasher.hexdigest()
             
         except Exception as e:
-            logger.error(f"Failed to compute checksum for {full_path}: {e}")
+            logger.error("Failed to compute checksum for {full_path}")
             raise

@@ -5,8 +5,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, List, Optional, Tuple
 import ta
-from loguru import logger
-
+from src.utils import logger
 from config.settings import TECHNICAL_INDICATORS
 from datetime import datetime
 
@@ -410,7 +409,7 @@ class TechnicalIndicatorCalculator:
                 return pd.to_datetime(result['latest_datetime'].iloc[0])
             return None
         except Exception as e:
-            logger.error(f"Error getting latest datetime: {e}")
+            logger.error("Error getting latest datetime")
             return None
 
 
@@ -497,7 +496,7 @@ class TechnicalIndicatorCalculator:
                 table = self.client.create_table(table, exists_ok=True)
                 logger.info(f"Created hourly table: {table_id}")
             except Exception as e:
-                logger.error(f"Error creating hourly table {table_name}: {e}")
+                logger.error("Error creating hourly table {table_name}")
 
     def create_daily_aggregates_view(self):
         """Create a view that aggregates hourly data to daily."""
@@ -549,7 +548,7 @@ class TechnicalIndicatorCalculator:
             self.client.query(view_query).result()
             logger.info(f"Created daily aggregates view: {view_id}")
         except Exception as e:
-            logger.error(f"Error creating daily aggregates view: {e}")
+            logger.error("Error creating daily aggregates view")
 
 
     def get_hourly_data_stats(self, start_date: str, end_date: str) -> pd.DataFrame:

@@ -4,7 +4,7 @@ OHLCV data fetcher for historical and daily updates.
 import pandas as pd
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
-from loguru import logger
+from src.utils import logger
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 

@@ -4,7 +4,7 @@ Macro economic data fetcher for economic indicators.
 import pandas as pd
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
-from loguru import logger
+from src.utils import logger
 import time
 
 from config.settings import MACRO_INDICATORS, BQ_TABLES
@@ -63,7 +63,7 @@ class MacroDataFetcher:
                 # time.sleep(12)  # 5 calls per minute limit
 
             except Exception as e:
-                logger.error(f"Failed to fetch {indicator}: {e}")
+                logger.error("Failed to fetch {indicator}")
 
         return results
 
@@ -249,7 +249,7 @@ class MacroDataFetcher:
             return True
 
         except Exception as e:
-            logger.error(f"Failed to store macro data: {e}")
+            logger.error("Failed to store macro data")
             return False
 
     def get_latest_indicators(self) -> pd.DataFrame:
@@ -386,5 +386,5 @@ class MacroDataUpdater:
             return False
 
         except Exception as e:
-            logger.error(f"Macro data update failed: {e}")
+            logger.error("Macro data update failed")
             return False

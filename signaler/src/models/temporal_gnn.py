@@ -8,8 +8,7 @@ from torch_geometric.nn import GCNConv, GATConv, global_mean_pool
 from torch_geometric.data import Data, Batch
 from typing import List, Tuple, Dict, Optional
 import numpy as np
-from loguru import logger
-
+from src.utils import logger
 from config.settings import GNN_CONFIG, MODEL_CONFIG
 
 
