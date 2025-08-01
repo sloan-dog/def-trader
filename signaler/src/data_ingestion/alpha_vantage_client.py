@@ -59,6 +59,10 @@ class AlphaVantageClient:
         self._rate_limit_wait()
 
         try:
+            # Log the full URL being called
+            full_url = requests.Request('GET', self.base_url, params=params).prepare().url
+            logger.info(f"Calling Alpha Vantage API: {full_url.replace(self.api_key, 'REDACTED')}")
+            
             response = requests.get(
                 self.base_url,
                 params=params,
@@ -169,9 +173,9 @@ class AlphaVantageClient:
             'function': 'TIME_SERIES_INTRADAY',
             'symbol': symbol,
             'interval': '60min',
-            'adjusted': 'true',
+            'outputsize': 'full',
             'extended_hours': str(extended_hours).lower(),
-            'outputsize': 'full'
+            'datatype': 'json'
         }
 
         # Add month parameter if specified

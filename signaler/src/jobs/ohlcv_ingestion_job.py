@@ -297,4 +297,38 @@ def continuous(interval, bucket):
 
 
 if __name__ == '__main__':
-    cli()
+    # Support running from environment variables for Cloud Run
+    import os
+    if os.getenv('JOB_MODE'):
+        job = OHLCVIngestionJob()
+        mode = os.getenv('JOB_MODE', 'backfill')
+        
+        if mode == 'backfill':
+            # Parse environment variables
+            symbols = os.getenv('TICKERS', '').split(';') if os.getenv('TICKERS') else None
+            start_date = os.getenv('START_DATE')
+            end_date = os.getenv('END_DATE')
+            interval = os.getenv('INTERVAL', '60min')
+            
+            logger.info(f"Starting backfill from env vars: symbols={symbols}, dates={start_date} to {end_date}")
+            
+            success = job.run_historical_backfill(
+                symbols=symbols,
+                start_date=start_date,
+                end_date=end_date,
+                interval=interval
+            )
+            sys.exit(0 if success else 1)
+        elif mode == 'update':
+            symbols = os.getenv('TICKERS', '').split(';') if os.getenv('TICKERS') else None
+            lookback = int(os.getenv('LOOKBACK_HOURS', '24'))
+            interval = os.getenv('INTERVAL', '60min')
+            
+            success = job.run_daily_update(
+                symbols=symbols,
+                lookback_hours=lookback,
+                interval=interval
+            )
+            sys.exit(0 if success else 1)
+    else:
+        cli()

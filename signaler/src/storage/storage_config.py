@@ -24,7 +24,7 @@ STORAGE_PATHS = {
 
 # Partition strategies
 PARTITION_SCHEMES = {
-    'ohlcv': ['symbol', 'year', 'month', 'day'],
+    'ohlcv': ['symbol', 'year', 'month'],  # Changed from daily to monthly partitioning
     'technical_indicators': ['symbol', 'date'],
     'sentiment': ['symbol', 'date'],
     'macro': ['date'],

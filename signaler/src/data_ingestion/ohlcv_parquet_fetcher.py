@@ -465,27 +465,35 @@ class OHLCVParquetFetcher:
             logger.error(f"Available columns: {df.columns.tolist()}")
             raise ValueError("Missing timestamp column")
         
-        # Add partition columns
-        df['date'] = df['timestamp'].dt.date
+        # Add required columns
+        df['symbol'] = symbol
+        
+        # Add partition columns - PyArrow will use these for directory structure
+        # and exclude them from the actual parquet files
         df['year'] = df['timestamp'].dt.year
         df['month'] = df['timestamp'].dt.month
-        df['day'] = df['timestamp'].dt.day
         
-        # Add metadata
-        df['interval'] = interval
-        df['ingested_at'] = datetime.now()
+        # Keep date column for compatibility with existing code
+        if 'date' not in df.columns:
+            df['date'] = df['timestamp'].dt.date
         
         # Select and order columns
         columns = [
-            'symbol', 'timestamp', 'open', 'high', 'low', 'close', 'volume',
-            'adjusted_close', 'dividend', 'split_coefficient',
-            'date', 'year', 'month', 'day', 'interval', 'ingested_at'
+            'timestamp', 'open', 'high', 'low', 'close', 'volume',
+            'adjusted_close', 'date'
         ]
         
-        # Keep only columns that exist
-        columns = [col for col in columns if col in df.columns]
+        # Add optional columns if they exist
+        optional_cols = ['dividend', 'split_coefficient']
+        for col in optional_cols:
+            if col in df.columns:
+                columns.append(col)
         
-        return df[columns]
+        # Add partition columns to the DataFrame
+        # PyArrow will automatically exclude these from the parquet files
+        all_columns = columns + ['symbol', 'year', 'month']
+        
+        return df[all_columns]
     
     def _filter_date_range(
         self,
