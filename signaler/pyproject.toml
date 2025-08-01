@@ -36,6 +36,7 @@ dependencies = [
     # Basic data processing (used everywhere)
     "pandas>=2.0.0,<2.2.0",
     "numpy>=1.24.0,<2.0.0",
+    "python-dateutil>=2.8.0,<3.0.0",
     
     # Core Google Cloud (authentication and common)
     "google-cloud-bigquery>=3.12.0,<4.0.0",

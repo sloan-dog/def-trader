@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Tuple
 from src.utils import logger
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dateutil.relativedelta import relativedelta
 
 from src.storage import ParquetStorageClient
 from src.storage.storage_config import (
@@ -72,54 +73,81 @@ class OHLCVParquetFetcher:
         
         # Process symbols with rate limiting
         for symbol in symbols:
-            try:
-                logger.info(f"Fetching {symbol}...")
+            retries = 0
+            max_retries = INGESTION_CONFIG.get('max_retries', 3)
+            retry_delay = INGESTION_CONFIG.get('retry_delay', 5)
+            
+            while retries <= max_retries:
+                try:
+                    logger.info(f"Fetching {symbol}..." + (f" (retry {retries}/{max_retries})" if retries > 0 else ""))
+                    
+                    # Fetch from Alpha Vantage
+                    # For historical backfill with date range, use month-by-month fetching
+                    if start_date and interval == '60min':
+                        df = self._fetch_historical_months(
+                            symbol=symbol,
+                            start_date=start_date,
+                            end_date=end_date or datetime.now().strftime('%Y-%m-%d'),
+                            interval=interval
+                        )
+                    else:
+                        # For other intervals or no date range, use regular fetch
+                        df = self._fetch_symbol_data(
+                            symbol=symbol,
+                            interval=interval,
+                            outputsize='full'
+                        )
+                    
+                    if df is None or df.empty:
+                        logger.warning(f"No data returned for {symbol}")
+                        results['symbols_failed'].append(symbol)
+                        break
+
+                    logger.info(f"Fetched dataframe for {symbol}, {df.head()}")
+                    
+                    # Filter date range
+                    df = self._filter_date_range(df, start_date, end_date)
+                    
+                    if df.empty:
+                        logger.warning(f"No data in date range for {symbol}")
+                        continue
+                    
+                    # Prepare for storage
+                    df = self._prepare_dataframe(df, symbol, interval)
+
+                    logger.info(f"Prepared dataframe for {symbol}, {df.head()}")
+                    
+                    # Store to GCS
+                    write_result = self.storage_client.write_dataframe(
+                        df=df,
+                        path=f"{get_storage_path('ohlcv')}/{interval}",
+                        partition_cols=get_partition_cols('ohlcv'),
+                        compression='snappy'
+                    )
+                    
+                    results['symbols_processed'] += 1
+                    results['total_rows'] += write_result['rows_written']
+                    
+                    logger.info(f"Stored {write_result['rows_written']} rows for {symbol}")
+                    
+                    # Rate limiting handled by AlphaVantageClient (75 calls/min for premium)
+                    break  # Success, exit retry loop
                 
-                # Fetch from Alpha Vantage
-                df = self._fetch_symbol_data(
-                    symbol=symbol,
-                    interval=interval,
-                    outputsize='full'
-                )
-                
-                if df is None or df.empty:
-                    logger.warning(f"No data returned for {symbol}")
+                except ValueError as e:
+                    if "API call frequency limit reached" in str(e):
+                        retries += 1
+                        if retries <= max_retries:
+                            logger.warning(f"Rate limit hit for {symbol}, waiting {retry_delay}s before retry {retries}/{max_retries}")
+                            time.sleep(retry_delay)
+                            continue
+                    logger.error(f"Failed to process {symbol}: {e}")
                     results['symbols_failed'].append(symbol)
-                    continue
-
-                logger.info(f"Fetched dataframe for {symbol}, {df.head()}")
-                
-                # Filter date range
-                df = self._filter_date_range(df, start_date, end_date)
-                
-                if df.empty:
-                    logger.warning(f"No data in date range for {symbol}")
-                    continue
-                
-                # Prepare for storage
-                df = self._prepare_dataframe(df, symbol, interval)
-
-                logger.info(f"Prepared dataframe for {symbol}, {df.head()}")
-                
-                # Store to GCS
-                write_result = self.storage_client.write_dataframe(
-                    df=df,
-                    path=f"{get_storage_path('ohlcv')}/{interval}",
-                    partition_cols=get_partition_cols('ohlcv'),
-                    compression='snappy'
-                )
-                
-                results['symbols_processed'] += 1
-                results['total_rows'] += write_result['rows_written']
-                
-                logger.info(f"Stored {write_result['rows_written']} rows for {symbol}")
-                
-                # Rate limiting
-                time.sleep(12)  # Alpha Vantage free tier: 5 calls/min
-                
-            except Exception as e:
-                logger.error(f"Failed to process {symbol}")
-                results['symbols_failed'].append(symbol)
+                    break
+                    
+                except Exception as e:
+                    logger.error(f"Failed to process {symbol}: {e}")
+                    results['symbols_failed'].append(symbol)
+                    break
         
         results['end_time'] = datetime.now()
         results['duration'] = (results['end_time'] - results['start_time']).total_seconds()
@@ -158,47 +186,63 @@ class OHLCVParquetFetcher:
         
         # Process each symbol
         for symbol in symbols:
-            try:
-                # Get latest stored timestamp
-                latest_timestamp = self._get_latest_timestamp(symbol, interval)
-                
-                # Fetch recent data
-                df = self._fetch_symbol_data(
-                    symbol=symbol,
-                    interval=interval,
-                    outputsize='compact'  # Last 100 data points
-                )
-                
-                if df is None or df.empty:
-                    continue
-                
-                # Filter to new data only
-                if latest_timestamp:
-                    df = df[df['timestamp'] > latest_timestamp]
-                
-                if df.empty:
-                    logger.debug(f"No new data for {symbol}")
-                    continue
-                
-                # Prepare and append
-                df = self._prepare_dataframe(df, symbol, interval)
-                
-                append_result = self.storage_client.append_dataframe(
-                    df=df,
-                    path=f"{get_storage_path('ohlcv')}/{interval}",
-                    partition_cols=get_partition_cols('ohlcv'),
-                    deduplicate_cols=['symbol', 'timestamp']
-                )
-                
-                results['symbols_updated'] += 1
-                results['new_rows'] += append_result.get('rows_appended', 0)
-                results['duplicates_skipped'] += append_result.get('duplicates_skipped', 0)
-                
-                # Rate limiting
-                time.sleep(12)
-                
-            except Exception as e:
-                logger.error(f"Failed to update {symbol}")
+            retries = 0
+            max_retries = INGESTION_CONFIG.get('max_retries', 3)
+            retry_delay = INGESTION_CONFIG.get('retry_delay', 5)
+            
+            while retries <= max_retries:
+                try:
+                    # Get latest stored timestamp
+                    latest_timestamp = self._get_latest_timestamp(symbol, interval)
+                    
+                    # Fetch recent data
+                    df = self._fetch_symbol_data(
+                        symbol=symbol,
+                        interval=interval,
+                        outputsize='compact'  # Last 100 data points
+                    )
+                    
+                    if df is None or df.empty:
+                        break
+                    
+                    # Filter to new data only
+                    if latest_timestamp:
+                        df = df[df['timestamp'] > latest_timestamp]
+                    
+                    if df.empty:
+                        logger.debug(f"No new data for {symbol}")
+                        continue
+                    
+                    # Prepare and append
+                    df = self._prepare_dataframe(df, symbol, interval)
+                    
+                    append_result = self.storage_client.append_dataframe(
+                        df=df,
+                        path=f"{get_storage_path('ohlcv')}/{interval}",
+                        partition_cols=get_partition_cols('ohlcv'),
+                        deduplicate_cols=['symbol', 'timestamp']
+                    )
+                    
+                    results['symbols_updated'] += 1
+                    results['new_rows'] += append_result.get('rows_appended', 0)
+                    results['duplicates_skipped'] += append_result.get('duplicates_skipped', 0)
+                    
+                    # Rate limiting handled by AlphaVantageClient
+                    break  # Success, exit retry loop
+                    
+                except ValueError as e:
+                    if "API call frequency limit reached" in str(e):
+                        retries += 1
+                        if retries <= max_retries:
+                            logger.warning(f"Rate limit hit for {symbol}, waiting {retry_delay}s before retry {retries}/{max_retries}")
+                            time.sleep(retry_delay)
+                            continue
+                    logger.error(f"Failed to update {symbol}: {e}")
+                    break
+                    
+                except Exception as e:
+                    logger.error(f"Failed to update {symbol}: {e}")
+                    break
         
         results['end_time'] = datetime.now()
         results['duration'] = (results['end_time'] - results['start_time']).total_seconds()
@@ -282,7 +326,8 @@ class OHLCVParquetFetcher:
         self,
         symbol: str,
         interval: str,
-        outputsize: str
+        outputsize: str,
+        month: Optional[str] = None
     ) -> Optional[pd.DataFrame]:
         """Fetch data from Alpha Vantage."""
         try:
@@ -290,15 +335,88 @@ class OHLCVParquetFetcher:
             # Only use daily endpoint if explicitly requesting daily bars
             if interval == 'daily':
                 df = self.av_client.get_daily_ohlcv(symbol, outputsize)
+            elif interval == '60min' and month:
+                # Use the hourly endpoint with month parameter for historical data
+                df = self.av_client.get_hourly_ohlcv(symbol, month=month)
             else:
-                # This handles 1min, 5min, 15min, 30min, 60min
+                # This handles 1min, 5min, 15min, 30min, 60min (recent data)
                 df = self.av_client.get_intraday_data(symbol, interval, outputsize)
             
             return df
             
         except Exception as e:
-            logger.error(f"Error fetching {symbol}")
+            logger.error(f"Error fetching {symbol}" + (f" for month {month}" if month else ""))
             return None
+    
+    def _fetch_historical_months(
+        self,
+        symbol: str,
+        start_date: str,
+        end_date: str,
+        interval: str = '60min'
+    ) -> Optional[pd.DataFrame]:
+        """Fetch historical data month by month for a symbol."""
+        if interval != '60min':
+            # For non-hourly intervals, use the regular fetch
+            return self._fetch_symbol_data(symbol, interval, 'full')
+        
+        # Parse dates
+        start_dt = pd.to_datetime(start_date)
+        end_dt = pd.to_datetime(end_date)
+        
+        # Limit to Alpha Vantage's historical data availability (January 2000)
+        av_start = pd.to_datetime('2000-01-01')
+        if start_dt < av_start:
+            logger.info(f"Adjusting start date from {start_date} to 2000-01-01 (Alpha Vantage limit)")
+            start_dt = av_start
+        
+        all_data = []
+        current_month = start_dt
+        
+        # Generate list of months to fetch
+        while current_month <= end_dt:
+            month_str = current_month.strftime('%Y-%m')
+            logger.info(f"Fetching {symbol} for {month_str}...")
+            
+            # Fetch this month's data
+            df = self._fetch_symbol_data(symbol, interval, 'full', month=month_str)
+            
+            if df is not None and not df.empty:
+                all_data.append(df)
+                logger.debug(f"Got {len(df)} rows for {symbol} in {month_str}")
+            else:
+                logger.warning(f"No data for {symbol} in {month_str}")
+            
+            # Move to next month
+            current_month = current_month + relativedelta(months=1)
+            
+            # Rate limiting is handled by AlphaVantageClient
+        
+        if not all_data:
+            return None
+        
+        # Combine all monthly data
+        # First, ensure all DataFrames have their index reset to avoid issues
+        reset_data = []
+        for df in all_data:
+            if isinstance(df.index, pd.DatetimeIndex):
+                df_reset = df.reset_index(drop=True)
+            else:
+                df_reset = df.copy()
+            reset_data.append(df_reset)
+        
+        combined_df = pd.concat(reset_data, ignore_index=True)
+        
+        # Remove duplicates based on datetime column (which Alpha Vantage provides)
+        if 'datetime' in combined_df.columns:
+            combined_df = combined_df.drop_duplicates(subset=['datetime'])
+            combined_df = combined_df.sort_values('datetime')
+        elif 'timestamp' in combined_df.columns:
+            combined_df = combined_df.drop_duplicates(subset=['timestamp'])
+            combined_df = combined_df.sort_values('timestamp')
+        
+        logger.info(f"Combined {len(all_data)} months of data for {symbol}: {len(combined_df)} total rows")
+        return combined_df
     
     def _prepare_dataframe(
         self,
@@ -315,10 +433,13 @@ class OHLCVParquetFetcher:
         if 'timestamp' not in df.columns and df.index.name in ['date', 'timestamp', 'datetime']:
             df = df.reset_index()
         
+        # Drop the existing 'date' column if it exists (Alpha Vantage provides it)
+        if 'date' in df.columns and 'datetime' in df.columns:
+            df = df.drop(columns=['date'])
+        
         # Rename columns to standard names
         column_mapping = {
-            'date': 'timestamp',
-            'datetime': 'timestamp',  # For intraday data
+            'datetime': 'timestamp',  # For intraday data from Alpha Vantage
             '1. open': 'open',
             '2. high': 'high', 
             '3. low': 'low',
@@ -332,11 +453,17 @@ class OHLCVParquetFetcher:
         
         df = df.rename(columns=column_mapping)
         
-        # Add symbol
-        df['symbol'] = symbol
+        # Add symbol if not present
+        if 'symbol' not in df.columns:
+            df['symbol'] = symbol
         
         # Ensure timestamp is datetime
-        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        if 'timestamp' in df.columns:
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+        else:
+            logger.error(f"No timestamp column found for {symbol}")
+            logger.error(f"Available columns: {df.columns.tolist()}")
+            raise ValueError("Missing timestamp column")
         
         # Add partition columns
         df['date'] = df['timestamp'].dt.date

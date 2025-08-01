@@ -16,6 +16,7 @@ from config.settings import (
     ALPHA_VANTAGE_BASE_URL,
     ALPHA_VANTAGE_RATE_LIMIT,
     ALPHA_VANTAGE_TIMEOUT,
+    ALPHA_VANTAGE_CALL_DELAY,
     MACRO_INDICATORS
 )
 
@@ -29,6 +30,7 @@ class AlphaVantageClient:
         self.base_url = ALPHA_VANTAGE_BASE_URL
         self.rate_limit = ALPHA_VANTAGE_RATE_LIMIT  # Should be 75 for premium
         self.timeout = ALPHA_VANTAGE_TIMEOUT
+        self.call_delay = ALPHA_VANTAGE_CALL_DELAY  # Enforced delay between calls
         self.last_request_time = 0
         self._session = None
 
@@ -36,11 +38,14 @@ class AlphaVantageClient:
         """Implement rate limiting to avoid API throttling."""
         current_time = time.time()
         time_since_last_request = current_time - self.last_request_time
-        min_interval = 60 / self.rate_limit  # seconds between requests
+        
+        # Use the maximum of calculated rate limit interval and enforced call delay
+        calculated_interval = 60 / self.rate_limit  # seconds between requests based on rate limit
+        min_interval = max(calculated_interval, self.call_delay)
 
         if time_since_last_request < min_interval:
             wait_time = min_interval - time_since_last_request
-            logger.debug(f"Rate limiting: waiting {wait_time:.2f} seconds")
+            logger.debug(f"Rate limiting: waiting {wait_time:.2f} seconds (enforced delay: {self.call_delay}s)")
             time.sleep(wait_time)
 
         self.last_request_time = time.time()

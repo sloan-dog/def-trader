@@ -52,6 +52,7 @@ ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY", "")
 ALPHA_VANTAGE_BASE_URL = "https://www.alphavantage.co/query"
 ALPHA_VANTAGE_RATE_LIMIT = 75  # Premium tier: 75 calls per minute
 ALPHA_VANTAGE_TIMEOUT = 30  # seconds
+ALPHA_VANTAGE_CALL_DELAY = float(os.getenv("ALPHA_VANTAGE_CALL_DELAY", "2.0"))  # Enforced delay between calls in seconds
 
 # Model settings - Updated for hourly data
 MODEL_CONFIG = {
